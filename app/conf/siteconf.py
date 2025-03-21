@@ -480,7 +480,12 @@ class SiteConf:
             '2XFREE': [""],
             'HR': [],
             'PEER_COUNT': ["//div[@class='ant-form-item-control-input-content']/span[contains(text(),'正在做种: )]"],
-        }
+        },
+        "rss.m-team.cc": {
+            'FREE': ["y"],
+            '2XFREE': ["y"],
+            'HR': ["y"]
+        } 
     }
     # 公共BT站点
     PUBLIC_TORRENT_SITES = {

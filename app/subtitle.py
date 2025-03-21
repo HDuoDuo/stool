@@ -259,7 +259,7 @@ class Subtitle:
         else:
             return SystemUtils.copy(sub_file, new_sub_file)
 
-    def download_subtitle_from_site(self, media_info, cookie, ua, download_dir):
+    def download_subtitle_from_site(self, media_info, site_id, cookie, ua, apikey, download_dir):
         """
         从站点下载字幕文件，并保存到本地
         """
@@ -270,6 +270,15 @@ class Subtitle:
         if not download_dir:
             log.warn("【Subtitle】未找到字幕下载目录")
             return
+        # 站点流控
+        if self.sites.check_ratelimit(site_id):
+            log.warn(f"【Sites】{site_id}触发了站点流控，停止下载字幕")
+            return
+        # 馒头特殊处理
+        domain = StringUtils.get_url_domain(media_info.page_url)
+        if 'm-team' in domain:
+            from app.apis import MTeamApi
+            return MTeamApi.download_subtitle(media_info, site_id, cookie, ua, apikey, download_dir)
         # 读取网站代码
         request = RequestUtils(cookies=cookie, headers=ua)
         res = request.get_res(media_info.page_url)

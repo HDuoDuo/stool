@@ -85,7 +85,7 @@ class ChromeHelper(object):
         chrome.set_page_load_timeout(30)
         return chrome
 
-    def visit(self, url, ua=None, cookie=None, timeout=30):
+    def visit(self, url, ua=None, apikey=None, cookie=None, timeout=30):
         if not self.browser:
             return False
         try:
@@ -106,7 +106,7 @@ class ChromeHelper(object):
             print(str(err))
             return False
 
-    def new_tab(self, url, ua=None, cookie=None):
+    def new_tab(self, url, ua=None, apikey=None, cookie=None):
         if not self._chrome:
             return False
         # 新开一个标签页
@@ -116,7 +116,7 @@ class ChromeHelper(object):
             print(str(err))
             return False
         # 访问URL
-        return self.visit(url=url, ua=ua, cookie=cookie)
+        return self.visit(url=url, ua=ua, apikey=apikey, cookie=cookie)
 
     def close_tab(self):
         try:

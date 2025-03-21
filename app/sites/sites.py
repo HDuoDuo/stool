@@ -21,6 +21,8 @@ from app.conf import SiteConf
 from app.utils import RequestUtils, StringUtils, ExceptionUtils
 from app.utils.commons import singleton
 from config import Config
+from app.apis import MTeamApi
+from app.sites.site_limiter import SiteRateLimiter
 
 lock = Lock()
 
@@ -39,6 +41,7 @@ class Sites:
     _brush_sites = []
     _statistic_sites = []
     _signin_sites = []
+    _limiters = {}
     _last_update_time = None
 
     _MAX_CONCURRENCY = 10
@@ -67,6 +70,8 @@ class Sites:
         self._statistic_sites = []
         # 开启签到功能站点：
         self._signin_sites = []
+        # 站点限速器
+        self._limiters = {}
         # 站点图标
         self.__init_favicons()
         # 站点数据
@@ -78,13 +83,14 @@ class Sites:
             site_rssurl = site.RSSURL
             site_signurl = site.SIGNURL
             site_cookie = site.COOKIE
+            site_apikey = site_note.get("apikey")
             site_uses = site.INCLUDE or ''
             uses = []
             if site_uses:
                 signin_enable = True if "Q" in site_uses and site_signurl and site_cookie else False
                 rss_enable = True if "D" in site_uses and site_rssurl else False
-                brush_enable = True if "S" in site_uses and site_rssurl and site_cookie else False
-                statistic_enable = True if "T" in site_uses and (site_rssurl or site_signurl) and site_cookie else False
+                brush_enable = True if "S" in site_uses and site_rssurl and (site_cookie or site_apikey) else False
+                statistic_enable = True if "T" in site_uses and (site_rssurl or site_signurl) and (site_cookie or site_apikey) else False
                 uses.append("Q") if signin_enable else None
                 uses.append("D") if rss_enable else None
                 uses.append("S") if brush_enable else None
@@ -109,11 +115,15 @@ class Sites:
                 "statistic_enable": statistic_enable,
                 "uses": uses,
                 "ua": site_note.get("ua"),
+                "apikey": site_note.get("apikey"),
                 "parse": True if site_note.get("parse") == "Y" else False,
                 "unread_msg_notify": True if site_note.get("message") == "Y" else False,
                 "chrome": True if site_note.get("chrome") == "Y" else False,
                 "proxy": True if site_note.get("proxy") == "Y" else False,
-                "subtitle": True if site_note.get("subtitle") == "Y" else False
+                "subtitle": True if site_note.get("subtitle") == "Y" else False,
+                "limit_interval": site_note.get("limit_interval"),
+                "limit_count": site_note.get("limit_count"),
+                "limit_seconds": site_note.get("limit_seconds")
             }
             # 以ID存储
             self._siteByIds[site.ID] = site_info
@@ -121,6 +131,17 @@ class Sites:
             site_strict_url = StringUtils.get_url_domain(site.SIGNURL or site.RSSURL)
             if site_strict_url:
                 self._siteByUrls[site_strict_url] = site_info
+            # 初始化站点限速器
+            self._limiters[site.ID] = SiteRateLimiter(
+                limit_interval=int(site_note.get("limit_interval")) * 60 if site_note.get("limit_interval") and str(
+                    site_note.get("limit_interval")).isdigit() and site_note.get("limit_count") and str(
+                    site_note.get("limit_count")).isdigit() else None,
+                limit_count=int(site_note.get("limit_count")) if site_note.get("limit_interval") and str(
+                    site_note.get("limit_interval")).isdigit() and site_note.get("limit_count") and str(
+                    site_note.get("limit_count")).isdigit() else None,
+                limit_seconds=int(site_note.get("limit_seconds")) if site_note.get("limit_seconds") and str(
+                    site_note.get("limit_seconds")).isdigit() else None
+            )
 
     def __init_favicons(self):
         """
@@ -157,6 +178,12 @@ class Sites:
         if siteid or siteurl:
             return {}
         return ret_sites
+    
+    def get_sites_by_url_domain(self, url):
+        """
+        根据传入的url获取站点配置
+        """
+        return self._siteByUrls.get(StringUtils.get_url_domain(url))
 
     def ratio_beyong(self, site_name):
         """
@@ -164,12 +191,22 @@ class Sites:
         """
         if not self._sites_data.get(site_name):
             self.get_pt_date(specify_sites=[site_name], force=True)
-        site_ratio = ("%.3f" % float(self._sites_data.get(site_name, []).get('ratio', 0)))
-        limit_ratio = ("%.3f" % float(Config().get_config(site_name).get('pt_ratio_limit', 0)))
-        if site_ratio and limit_ratio:
-            if site_ratio > limit_ratio:
-                return True
-        return False
+        site_ratio = float(("%.3f" % float(self._sites_data.get(site_name, {}).get('ratio', 0))))
+        limit_ratio = float(("%.3f" % float(Config().get_config(site_name).get('pt_ratio_limit', 0))))
+        return True if site_ratio and limit_ratio and site_ratio > limit_ratio else False
+    
+    def check_ratelimit(self, site_id):
+        """
+        检查站点是否触发流控
+        :param site_id: 站点ID
+        :return: True为触发了流控，False为未触发
+        """
+        state = False
+        if self._limiters.get(site_id) is not None:
+            state, msg = self._limiters[site_id].check_rate_limit()
+            if msg:
+                log.warn(f"【Sites】站点 {self._siteByIds[site_id].get('name')} {msg}")
+        return state
 
     def get_site_dict(self,
                       rss=False,
@@ -286,6 +323,7 @@ class Sites:
             return
         site_cookie = site_info.get("cookie")
         ua = site_info.get("ua")
+        apikey = site_info.get("apikey")
         unread_msg_notify = site_info.get("unread_msg_notify")
         chrome = site_info.get("chrome")
         proxy = site_info.get("proxy")
@@ -294,6 +332,7 @@ class Sites:
                                                          site_name=site_name,
                                                          site_cookie=site_cookie,
                                                          ua=ua,
+                                                         apikey=apikey,
                                                          emulate=chrome,
                                                          proxy=proxy)
             if site_user_info:
@@ -360,17 +399,21 @@ class Sites:
         if not site_info:
             return False, "站点不存在", 0
         site_cookie = site_info.get("cookie")
-        if not site_cookie:
-            return False, "未配置站点Cookie", 0
+        site_apikey = site_info.get("apikey")
+        if not site_apikey and not site_cookie:
+            return False, "未配置站点Cookie或ApiKey", 0
         ua = site_info.get("ua")
         site_url = StringUtils.get_base_url(site_info.get("signurl") or site_info.get("rssurl"))
         if not site_url:
             return False, "未配置站点地址", 0
+        # 站点特殊处理...
+        if 'm-team' in site_url:
+            return MTeamApi.test_mt_connection(site_info)
         chrome = ChromeHelper()
         if site_info.get("chrome") and chrome.get_status():
             # 计时
             start_time = datetime.now()
-            if not chrome.visit(url=site_url, ua=ua, cookie=site_cookie):
+            if not chrome.visit(url=site_url, ua=ua, apikey=site_apikey, cookie=site_cookie):
                 return False, "Chrome模拟访问失败", 0
             # 循环检测是否过cf
             cloudflare = chrome.pass_cloudflare()
@@ -698,7 +741,7 @@ class Sites:
                 return v
         return {}
 
-    def check_torrent_attr(self, torrent_url, cookie, ua=None, proxy=False):
+    def check_torrent_attr(self, torrent_url, cookie, ua=None, apikey=None, proxy=False):
         """
         检验种子是否免费，当前做种人数
         :param torrent_url: 种子的详情页面
@@ -715,6 +758,9 @@ class Sites:
         }
         if not torrent_url:
             return ret_attr
+        domain = StringUtils.get_url_domain(torrent_url)
+        if 'm-team' in domain:
+            return MTeamApi.check_torrent_attr(torrent_url, ua, apikey, proxy)
         xpath_strs = self.get_grapsite_conf(torrent_url)
         if not xpath_strs:
             return ret_attr

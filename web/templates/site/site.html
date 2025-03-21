@@ -196,6 +196,15 @@
         <div class="row">
           <div class="col-lg-12">
             <div class="mb-3">
+              <label class="form-label">Api-Key <span class="form-help"
+                                                         title="站点签到/数据获取/搜索请求时使用的api-key，一些网站必须用api-key拉取数据，如新版mt" data-bs-toggle="tooltip">?</span></label>
+              <input type="text" class="form-control" id="site_apikey" value="" placeholder="站点访问Api-Key">
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-12">
+            <div class="mb-3">
               <label class="form-label">RSS订阅地址 <span class="form-help" title="站点订阅源URL地址，用于电影、电视剧订阅、刷流，点击站点RSS图标获取"
                   data-bs-toggle="tooltip">?</span></label>
               <input type="text" class="form-control" id="site_rssurl" value="" placeholder="站点RSS订阅URL">
@@ -292,6 +301,34 @@
             </div>
           </div>
         </div>
+        <details>
+          <summary class="summary">
+            站点流控规则 <span class="form-help" title="控制全局站点访问频率，触发流控时将跳过该站点，留空则不限制"
+                            data-bs-toggle="tooltip">?</span>
+          </summary>
+          <div class="row mt-2">
+            <div class="row">
+              <div class="col-lg-4">
+                <div class="mb-3">
+                  <label class="form-label">单位时间（分钟）</label>
+                  <input type="text" class="form-control" id="sitelimit_interval" value="" placeholder="10">
+                </div>
+              </div>
+              <div class="col-lg-4">
+                <div class="mb-3">
+                  <label class="form-label">单位时间内访问次数 </label>
+                  <input type="text" class="form-control" id="sitelimit_count" value="" placeholder="10">
+                </div>
+              </div>
+               <div class="col-lg-4">
+                <div class="mb-3">
+                  <label class="form-label">访问间隔（秒） </label>
+                  <input type="text" class="form-control" id="sitelimit_seconds" value="" placeholder="5">
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
       <div class="modal-footer">
         <button id="site_close_btn" class="btn btn-link">
@@ -491,11 +528,15 @@
     $("#site_cookie").val('');
     $("#site_rule").val('');
     $("#site_ua").val('');
+    $("#site_apikey").val('');
     $("#site_chrome").val('N');
     $("#site_proxy").val('N');
     $("#site_parse").val('Y');
     $("#site_subtitle").val('N');
     $("#site_unread_msg_notify").val('Y');
+    $("#sitelimit_interval").val('');
+    $("#sitelimit_count").val('');
+    $("#sitelimit_seconds").val('');
     $("#site_close_btn").text("关闭");
     $("#modal-site-title").text("新增站点");
     $("#add_or_edit_site_btn").text("新增");
@@ -515,6 +556,7 @@
         $("#site_signurl").val(ret.site.signurl);
         $("#site_cookie").val(ret.site.cookie);
         $("#site_ua").val(ret.site.ua);
+        $("#site_apikey").val(ret.site.apikey);
         if (ret.site.parse) {
           $("#site_parse").val("Y");
         } else {
@@ -541,6 +583,9 @@
           $("#site_unread_msg_notify").val("N");
         }
         select_SelectPart(ret.site.uses, "site_uses")
+        $("#sitelimit_interval").val(ret.site.limit_interval);
+        $("#sitelimit_count").val(ret.site.limit_count);
+        $("#sitelimit_seconds").val(ret.site.limit_seconds);
         $("#modal-site-title").text("编辑站点");
         $("#add_or_edit_site_btn").text("修改");
         $("#modal-site").modal("show");
@@ -608,9 +653,32 @@
       $("#site_rssurl").removeClass("is-invalid");
     };
     let ua = $("#site_ua").val();
+    let apikey = $("#site_apikey").val();
     let chrome = $("#site_chrome").val();
     let proxy = $("#site_proxy").val();
     let subtitle = $("#site_subtitle").val();
+    // 流控规则
+    let limit_interval = $("#sitelimit_interval").val();
+    if (limit_interval && isNaN(limit_interval)) {
+      $("#sitelimit_interval").addClass("is-invalid");
+      return;
+    } else {
+      $("#sitelimit_interval").removeClass("is-invalid");
+    }
+    let limit_count = $("#sitelimit_count").val();
+    if (limit_count && isNaN(limit_count)) {
+      $("#sitelimit_count").addClass("is-invalid");
+      return;
+    } else {
+      $("#sitelimit_count").removeClass("is-invalid");
+    }
+    let limit_seconds = $("#sitelimit_seconds").val();
+    if (limit_seconds && isNaN(limit_seconds)) {
+      $("#sitelimit_seconds").addClass("is-invalid");
+      return;
+    } else {
+      $("#sitelimit_seconds").removeClass("is-invalid");
+    }
     let data = {
       "site_id": site_id,
       "site_name": site_name,
@@ -624,10 +692,14 @@
         "download_setting": site_download_setting,
         "parse": site_parse,
         "ua": ua,
+        "apikey": apikey,
         "chrome": chrome,
         "proxy": proxy,
         "message": site_unread_msg_notify,
-        "subtitle": subtitle
+        "subtitle": subtitle,
+        "limit_interval": limit_interval,
+        "limit_count": limit_count,
+        "limit_seconds": limit_seconds
       }
     }
 

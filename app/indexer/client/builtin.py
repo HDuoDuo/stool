@@ -9,6 +9,7 @@ from app.indexer.client._rarbg import Rarbg
 from app.indexer.client._render_spider import RenderSpider
 from app.indexer.client._spider import TorrentSpider
 from app.indexer.client._tnode import TNodeSpider
+from app.indexer.client._mt_spider import MTSpider
 from app.sites import Sites
 from app.utils import StringUtils
 from app.utils.types import SearchType, IndexerType
@@ -53,7 +54,9 @@ class BuiltinIndexer(_IIndexClient):
         for site in Sites().get_sites():
             if not site.get("rssurl") and not site.get("signurl"):
                 continue
-            if not site.get("cookie"):
+            cookie = site.get("cookie")
+            apikey = site.get("apikey")
+            if not cookie and not apikey:
                 continue
             url = site.get("signurl") or site.get("rssurl")
             public_site = self.sites.get_public_sites(url=url)
@@ -72,8 +75,9 @@ class BuiltinIndexer(_IIndexClient):
                 render = False if not chrome_ok else None
                 parser = None
             indexer = IndexerHelper().get_indexer(url=url,
-                                                  cookie=site.get("cookie"),
+                                                  cookie=cookie,
                                                   ua=site.get("ua"),
+                                                  apikey=apikey,
                                                   name=site.get("name"),
                                                   rule=site.get("rule"),
                                                   pri=site.get('pri'),
@@ -152,6 +156,8 @@ class BuiltinIndexer(_IIndexClient):
             if indexer.parser == "Rarbg":
                 imdb_id = match_media.imdb_id if match_media else None
                 result_array = Rarbg().search(keyword=search_word, indexer=indexer, imdb_id=imdb_id)
+            elif 'm-team' in indexer.domain:
+                result_array = MTSpider(indexer).search(keyword=search_word)
             elif indexer.parser == "TNodeSpider":
                 result_array = TNodeSpider(indexer=indexer).search(keyword=search_word)
             elif indexer.parser == "RenderSpider":
@@ -186,7 +192,9 @@ class BuiltinIndexer(_IIndexClient):
         indexer: IndexerConf = self.get_indexers(indexer_id=index_id)
         if not indexer:
             return []
-        if indexer.parser == "RenderSpider":
+        if 'm-team' in indexer.domain:
+            return MTSpider(indexer).search(keyword=keyword, page=page)
+        elif indexer.parser == "RenderSpider":
             return RenderSpider().search(keyword=keyword,
                                          indexer=indexer,
                                          page=page)

@@ -122,6 +122,7 @@ class BrushTask(object):
                 "sendmessage": task.SENDMESSAGE,
                 "forceupload": task.FORCEUPLOAD,
                 "ua": site_info.get("ua"),
+                "apikey": site_info.get("apikey"),
                 "download_count": task.DOWNLOAD_COUNT,
                 "remove_count": task.REMOVE_COUNT,
                 "download_size": StringUtils.str_filesize(task.DOWNLOAD_SIZE),
@@ -157,6 +158,7 @@ class BrushTask(object):
         cookie = taskinfo.get("cookie")
         rss_free = taskinfo.get("free")
         ua = taskinfo.get("ua")
+        apikey = taskinfo.get("apikey")
         # 查询站点信息
         site_info = self.sites.get_sites(siteid=site_id)
         if not site_info:
@@ -172,8 +174,8 @@ class BrushTask(object):
         if not rss_url:
             log.error("【Brush】站点 %s 未配置RSS订阅地址，无法刷流！" % site_name)
             return
-        if rss_free and not cookie:
-            log.warn("【Brush】站点 %s 未配置Cookie，无法开启促销刷流" % site_name)
+        if rss_free and not (apikey or cookie):
+            log.warn("【Brush】站点 %s 未配置Cookie或Api-Key，无法开启促销刷流" % site_name)
             return
         # 下载器参数
         downloader_cfg = self.get_downloader_info(taskinfo.get("downloader"))
@@ -217,9 +219,7 @@ class BrushTask(object):
                 # 发布时间
                 pubdate = res.get('pubdate')
 
-                if enclosure not in self._torrents_cache:
-                    self._torrents_cache.append(enclosure)
-                else:
+                if enclosure in self._torrents_cache:
                     log.debug("【Brush】%s 已处理过" % torrent_name)
                     continue
 
@@ -230,7 +230,9 @@ class BrushTask(object):
                                              torrent_size=size,
                                              pubdate=pubdate,
                                              cookie=cookie,
+                                             siteid=site_id,
                                              ua=ua,
+                                             apikey=apikey,
                                              proxy=site_proxy):
                     continue
                 # 开始下载
@@ -260,6 +262,7 @@ class BrushTask(object):
                                                        dlcount=rss_rule.get("dlcount"),
                                                        downloadercfg=downloader_cfg):
                         break
+                    self._torrents_cache.append(enclosure)
             except Exception as err:
                 ExceptionUtils.exception_traceback(err)
                 continue
@@ -611,6 +614,9 @@ class BrushTask(object):
         """
         if not downloadercfg or not enclosure:
             return False
+        # 站点流控
+        if self.sites.check_ratelimit(site_info.get("id")):
+            return False
         # 标签
         tag = "已整理" if not transfer else None
         # 下载任务ID
@@ -697,8 +703,10 @@ class BrushTask(object):
                          torrent_url,
                          torrent_size,
                          pubdate,
+                         siteid,
                          cookie,
                          ua,
+                         apikey,
                          proxy):
         """
         检查种子是否符合刷流过滤条件
@@ -709,12 +717,16 @@ class BrushTask(object):
         :param pubdate: 发布时间
         :param cookie: Cookie
         :param ua: User-Agent
+        :param apikey: Api-Key
         :return: 是否命中
         """
         if not rss_rule:
             return True
-        # 检查种子大小
         try:
+            # 站点流控
+            if self.sites.check_ratelimit(siteid):
+                return False
+             # 检查种子大小
             if rss_rule.get("size"):
                 rule_sizes = rss_rule.get("size").split("#")
                 if rule_sizes[0]:
@@ -746,8 +758,9 @@ class BrushTask(object):
             torrent_attr = self.sites.check_torrent_attr(torrent_url=torrent_url,
                                                          cookie=cookie,
                                                          ua=ua,
+                                                         apikey=apikey,
                                                          proxy=proxy)
-            torrent_peer_count = torrent_attr.get("peer_count")
+            torrent_peer_count = int(torrent_attr.get("peer_count"))
             log.debug("【Brush】%s 解析详情, %s" % (title, torrent_attr))
 
             # 检查免费状态

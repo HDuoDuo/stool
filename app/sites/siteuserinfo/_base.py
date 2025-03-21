@@ -22,7 +22,7 @@ class _ISiteUserInfo(metaclass=ABCMeta):
     # 站点解析时判断顺序，值越小越先解析
     order = SITE_BASE_ORDER
 
-    def __init__(self, site_name, url, site_cookie, index_html, session=None, ua=None):
+    def __init__(self, site_name, url, site_cookie, index_html, session=None, ua=None, apikey=None, emulate=False, proxy=None):
         super().__init__()
         # 站点信息
         self.site_name = None
@@ -87,6 +87,9 @@ class _ISiteUserInfo(metaclass=ABCMeta):
         self._index_html = index_html
         self._session = session if session else requests.Session()
         self._ua = ua
+        self._apikey = apikey
+        self._emulate = emulate
+        self._proxy = proxy
 
     def site_schema(self):
         """

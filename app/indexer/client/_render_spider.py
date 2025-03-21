@@ -66,7 +66,8 @@ class RenderSpider(object):
             # 使用浏览器打开页面
             if not chrome.visit(url=search_url,
                                 cookie=indexer.cookie,
-                                ua=indexer.ua):
+                                ua=indexer.ua,
+                                apikey=indexer.apikey):
                 return []
             cloudflare = chrome.pass_cloudflare()
             if not cloudflare:
@@ -96,7 +97,8 @@ class RenderSpider(object):
             # 使用浏览器获取HTML文本
             if not chrome.visit(url=search_url,
                                 cookie=indexer.cookie,
-                                ua=indexer.ua):
+                                ua=indexer.ua,
+                                apikey=indexer.apikey):
                 return []
             cloudflare = chrome.pass_cloudflare()
             if not cloudflare:

@@ -93,6 +93,7 @@ class SiteSchema(Enum):
     TorrentLeech = "TorrentLeech"
     FileList = "FileList"
     TNode = "TNode"
+    MTeamTorrent = "MTeamTorrent"
 
 
 MovieTypes = ['MOV', '电影']
