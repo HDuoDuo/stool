@@ -149,15 +149,14 @@ class Downloader:
         # 没有种子文件解析链接
         else:
             url = media_info.enclosure
-            if not url:
+            if url == "m-team":
                 base_url = StringUtils.get_base_url(page_url)
-                if "m-team" in base_url:
-                    site_info = self.sites.get_sites_by_url_domain(base_url)
-                    url = MTeamApi.get_torrent_url_by_detail_url(base_url, page_url, site_info)
+                site_info = self.sites.get_sites_by_url_domain(base_url)
+                url = MTeamApi.get_torrent_url_by_detail_url(base_url, page_url, site_info)
             if not url:
                 return None, "下载链接为空"
             # 获取种子内容，磁力链不解析
-            if url.startswith("magnet:"):
+            if url.lower().startswith("magnet:"):
                 content = url
             else:
                 # [XPATH]为需从详情页面解析磁力链
@@ -176,7 +175,7 @@ class Downloader:
                     if not content:
                         return None, "无法从详情页面：%s 解析出下载链接" % url
                     # 解析出磁力链，补充Trackers
-                    if content.startswith("magnet:"):
+                    if content.lower().startswith("magnet:"):
                         content = Torrent.add_trackers_to_magnet(url=content, title=title)
                     # 解析出来的是HASH值，转换为磁力链
                     elif _hash:
@@ -186,7 +185,7 @@ class Downloader:
                 # 从HTTP链接下载种子
                 else:
                     # 获取Cookie和ua等
-                    site_info = self.sites.get_site_attr(url)
+                    site_info = self.sites.get_site_attr(page_url if "m-team" in url else url)
                     # 下载种子文件，并读取信息
                     _, content, dl_files_folder, dl_files, retmsg = Torrent().get_torrent_info(
                         url=url,
@@ -553,12 +552,6 @@ class Downloader:
 
         # 下载掉所有的电影
         for item in download_list:
-            # 没有种子文件解析链接
-            if not item.enclosure:
-                base_url = StringUtils.get_base_url(item.page_url)
-                if "m-team" in base_url:
-                    site_info = self.sites.get_sites_by_url_domain(base_url)
-                    item.enclosure = MTeamApi.get_torrent_url_by_detail_url(base_url, item.page_url, site_info)
             if item.type == MediaType.MOVIE:
                 __download(item)
 
@@ -1055,13 +1048,14 @@ class Downloader:
         解析种子文件，获取集数
         :return: 集数列表、种子路径
         """
-        if not url and page_url:
+        site_info = None
+        if url == "m-team":
             base_url = StringUtils.get_base_url(page_url)
-            if "m-team" in base_url:
-                site_info = self.sites.get_sites_by_url_domain(base_url)
-                url = MTeamApi.get_torrent_url_by_detail_url(base_url, page_url, site_info)
-        site_info = self.sites.get_site_attr(url)
-        if not site_info.get("cookie"):
+            site_info = self.sites.get_sites_by_url_domain(base_url)
+            url = MTeamApi.get_torrent_url_by_detail_url(base_url, page_url, site_info)
+        else:
+            site_info = self.sites.get_site_attr(url)
+        if not site_info.get("cookie") and not site_info.get("apikey"):
             return [], None
         # 保存种子文件
         file_path, _, _, files, retmsg = Torrent().get_torrent_info(

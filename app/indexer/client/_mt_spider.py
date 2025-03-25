@@ -101,7 +101,7 @@ class MTSpider(object):
                     'indexer': self._indexerid,
                     'title': result.get('name'),
                     'description': result.get('smallDescr'),
-                    'enclosure': "",  # 为了减少接口调用，种子连接在下载的时候查询
+                    'enclosure': "m-team",  # 为了减少接口调用故设置为"m-team",种子连接在下载的时候通过"m-team"标识查询
                     'pubdate': StringUtils.timestamp_to_date(result.get('lastModifiedDate')),
                     'size': result.get('size'),
                     'seeders': status.get('seeders'),

@@ -383,8 +383,7 @@ class TorrentSpider(feapder.AirSpider):
                 self.torrents_info['page_url'] = items[0]
             if 'filters' in self.fields.get('details', {}):
                 self.torrents_info['page_url'] = self.__filter_text(self.torrents_info.get('page_url'),
-                                                                    self.fields.get('details',
-                                                                                    {}).get('filters'))
+                                                                    self.fields.get('details', {}).get('filters'))
 
     def Getdownload(self, torrent):
         # download link
@@ -406,7 +405,7 @@ class TorrentSpider(feapder.AirSpider):
             download = torrent(self.fields.get('download', {}).get('selector', ''))
             items = [item.attr(self.fields.get('download', {}).get('attribute')) for item in download.items()]
             if items:
-                if not items[0].startswith("http") and not items[0].startswith("magnet"):
+                if not items[0].startswith("http") and not items[0].lower().startswith("magnet"):
                     self.torrents_info['enclosure'] = self.domain + items[0][1:] if items[0].startswith(
                         "/") else self.domain + items[0]
                 else:

@@ -11,6 +11,7 @@ from app.helper import OpenSubtitles
 from app.utils import RequestUtils, PathUtils, SystemUtils, StringUtils, ExceptionUtils
 from app.utils.commons import singleton
 from app.utils.types import MediaType
+from app.sites import Sites
 from config import Config, RMT_SUBEXT
 
 
@@ -271,7 +272,7 @@ class Subtitle:
             log.warn("【Subtitle】未找到字幕下载目录")
             return
         # 站点流控
-        if self.sites.check_ratelimit(site_id):
+        if Sites().check_ratelimit(site_id):
             log.warn(f"【Sites】{site_id}触发了站点流控，停止下载字幕")
             return
         # 馒头特殊处理

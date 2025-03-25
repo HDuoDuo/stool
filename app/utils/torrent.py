@@ -54,7 +54,7 @@ class Torrent:
         """
         if not url:
             return None, None, "", [], "URL为空"
-        if url.startswith("magnet:"):
+        if url.lower().startswith("magnet:"):
             return None, url, "", [], f"{url} 为磁力链接"
         try:
             # 下载保存种子文件
@@ -87,7 +87,7 @@ class Torrent:
         ).get_res(url=url, allow_redirects=False)
         while req and req.status_code in [301, 302]:
             url = req.headers['Location']
-            if url and url.startswith("magnet:"):
+            if url and url.lower().startswith("magnet:"):
                 return None, url, f"获取到磁力链接：{url}"
             req = RequestUtils(
                 headers=ua,
@@ -99,7 +99,7 @@ class Torrent:
             if not req.content:
                 return None, None, "未下载到种子数据"
             # 解析内容格式
-            if req.text and str(req.text).startswith("magnet:"):
+            if req.text and str(req.text).lower().startswith("magnet:"):
                 return None, req.text, "磁力链接"
             else:
                 try:
