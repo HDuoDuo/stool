@@ -500,6 +500,8 @@ class Media:
         :param append_to_response: 附加信息
         :param chinese: 是否转换中文标题
         """
+        if not tmdbid:
+            return None
         if not self.tmdb:
             log.error("【Meta】TMDB API Key 未设置！")
             return None

@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 import requests
 
 import log
+import re
 from app.helper import ThreadHelper
 from app.message.client._base import _IMessageClient
 from app.utils import RequestUtils, ExceptionUtils, StringUtils
@@ -79,6 +80,13 @@ class Telegram(_IMessageClient):
         """
         return self._telegram_user_ids
 
+    def formate_string(self, text: str):
+        """
+        发送消息需在实体外先转义MarkdownV2特殊字符
+        """
+        REFACTOR_REGEX = r"(?<!\\)(_|\*|\[|\]|\(|\)|\~|`|>|#|\+|-|=|\||\{|\}|\.|\!)"
+        return re.sub(REFACTOR_REGEX, lambda t: "\\"+t.group(), text)
+
     def send_msg(self, title, text="", image="", url="", user_id=""):
         """
         发送Telegram消息
@@ -94,9 +102,9 @@ class Telegram(_IMessageClient):
         try:
             if not self._telegram_token or not self._telegram_chat_id:
                 return False, "参数未配置"
-
-            # text中的Markdown特殊字符转义
-            text = text.replace("[", r"\[").replace("_", r"\_").replace("*", r"\*").replace("`", r"\`")
+            # MarkdownV2特殊字符转义
+            text = self.formate_string(text)
+            title = self.formate_string(title)
             # 拼装消息内容
             titles = str(title).split('\n')
             if len(titles) > 1:
@@ -131,41 +139,39 @@ class Telegram(_IMessageClient):
                 return False, "参数未配置"
             if not title or not isinstance(medias, list):
                 return False, "数据错误"
-            index, image, caption = 1, "", "*%s*" % title
+            index, image, caption = 1, "", "*%s*" % self.formate_string(title)
             for media in medias:
                 if not image:
                     image = media.get_message_image()
                 if title.find("回复序号下载") != -1:
-                    caption = "%s\n%s. [%s](%s)\n%s | %s | %s↑" % (caption,
-                                                                   index,
-                                                                   media.org_string,
-                                                                   media.page_url,
-                                                                   media.site,
-                                                                   StringUtils.str_filesize(int(media.size)),
-                                                                   media.seeders)
+                    caption = "%s\n%s\\. [%s](%s)\n__%s \\| %s \\| %s↑__" % (caption,
+                                                                                index,
+                                                                                self.formate_string(media.org_string),
+                                                                                self.formate_string(media.page_url),
+                                                                                self.formate_string(media.site),
+                                                                                self.formate_string(StringUtils.str_filesize(int(media.size))),
+                                                                                media.seeders)
                 else:
                     if media.get_vote_string():
-                        caption = "%s\n%s. [%s](%s)\n%s，%s" % (caption,
-                                                                index,
-                                                                media.get_title_string(),
-                                                                media.get_detail_url(),
-                                                                media.get_type_string(),
-                                                                media.get_vote_string())
+                        caption = "%s\n%s\\. [%s](%s)\n%s，%s" % (caption,
+                                                                    index,
+                                                                    self.formate_string(media.get_title_string()),
+                                                                    self.formate_string(media.get_detail_url()),
+                                                                    self.formate_string(media.get_type_string()),
+                                                                    self.formate_string(media.get_vote_string()))
                     else:
-                        caption = "%s\n%s. [%s](%s)\n%s" % (caption,
-                                                            index,
-                                                            media.get_title_string(),
-                                                            media.get_detail_url(),
-                                                            media.get_type_string())
+                        caption = "%s\n%s\\. [%s](%s)\n%s" % (caption,
+                                                                index,
+                                                                self.formate_string(media.get_title_string()),
+                                                                self.formate_string(media.get_detail_url() or Config().get_domain()),
+                                                                self.formate_string(media.get_type_string()))
                 index += 1
 
             if user_id:
                 chat_id = user_id
             else:
                 chat_id = self._telegram_chat_id
-
             return self.__send_request(chat_id=chat_id, image=image, caption=caption)
-
         except Exception as msg_e:
             ExceptionUtils.exception_traceback(msg_e)
             return False, str(msg_e)
@@ -175,7 +181,7 @@ class Telegram(_IMessageClient):
         向Telegram发送报文
         """
         def _res_parse(result):
-            if result:
+            if result is not None:
                 ret_json = result.json()
                 status = ret_json.get("ok")
                 if status:
@@ -188,7 +194,7 @@ class Telegram(_IMessageClient):
         proxies = Config().get_proxies()
         if image:
             # 发送图文消息
-            values = {"chat_id": chat_id, "photo": image, "caption": caption, "parse_mode": "Markdown"}
+            values = {"chat_id": chat_id, "photo": image, "caption": caption, "parse_mode": "MarkdownV2"}
             sc_url = "https://api.telegram.org/bot%s/sendPhoto?" % self._telegram_token
             res = RequestUtils(proxies=proxies).get_res(sc_url + urlencode(values))
             flag, msg = _res_parse(res)
@@ -198,14 +204,14 @@ class Telegram(_IMessageClient):
                 photo_req = RequestUtils(proxies=proxies).get_res(image)
                 if photo_req and photo_req.content:
                     sc_url = "https://api.telegram.org/bot%s/sendPhoto" % self._telegram_token
-                    data = {"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"}
+                    data = {"chat_id": chat_id, "caption": caption, "parse_mode": "MarkdownV2"}
                     files = {"photo": photo_req.content}
                     res = requests.post(sc_url, proxies=proxies, data=data, files=files)
                     flag, msg = _res_parse(res)
                     if flag:
                         return flag, msg
         # 发送文本消息
-        values = {"chat_id": chat_id, "text": caption, "parse_mode": "Markdown"}
+        values = {"chat_id": chat_id, "text": caption, "parse_mode": "MarkdownV2"}
         sc_url = "https://api.telegram.org/bot%s/sendMessage?" % self._telegram_token
         res = RequestUtils(proxies=proxies).get_res(sc_url + urlencode(values))
         flag, msg = _res_parse(res)
