@@ -229,10 +229,10 @@ class Media:
             else:
                 movies = self.search.movies({"query": file_media_name})
         except TMDbException as err:
-            log.error(f"【Meta】连接TMDB出错：{str(err)}")
+            log.info(f"【Meta】连接TMDB出错：{str(err)}")
             return None
         except Exception as e:
-            log.error(f"【Meta】连接TMDB出错：{str(e)}")
+            log.info(f"【Meta】连接TMDB出错：{str(e)}")
             return None
         log.debug(f"【Meta】API返回：{str(self.search.total_results)}")
         if len(movies) == 0:
@@ -288,10 +288,10 @@ class Media:
             else:
                 tvs = self.search.tv_shows({"query": file_media_name})
         except TMDbException as err:
-            log.error(f"【Meta】连接TMDB出错：{str(err)}")
+            log.info(f"【Meta】连接TMDB出错：{str(err)}")
             return None
         except Exception as e:
-            log.error(f"【Meta】连接TMDB出错：{str(e)}")
+            log.info(f"【Meta】连接TMDB出错：{str(e)}")
             return None
         log.debug(f"【Meta】API返回：{str(self.search.total_results)}")
         if len(tvs) == 0:
@@ -354,17 +354,17 @@ class Media:
                                 and season.get("season_number") == int(season_number):
                             return True
             except Exception as e1:
-                log.error(f"【Meta】连接TMDB出错：{e1}")
+                log.info(f"【Meta】连接TMDB出错：{e1}")
                 return False
             return False
 
         try:
             tvs = self.search.tv_shows({"query": file_media_name})
         except TMDbException as err:
-            log.error(f"【Meta】连接TMDB出错：{str(err)}")
+            log.info(f"【Meta】连接TMDB出错：{str(err)}")
             return None
         except Exception as e:
-            log.error(f"【Meta】连接TMDB出错：{e}")
+            log.info(f"【Meta】连接TMDB出错：{e}")
             return None
 
         if len(tvs) == 0:
@@ -394,10 +394,10 @@ class Media:
         try:
             multis = self.search.multi({"query": file_media_name}) or []
         except TMDbException as err:
-            log.error(f"【Meta】连接TMDB出错：{str(err)}")
+            log.info(f"【Meta】连接TMDB出错：{str(err)}")
             return None
         except Exception as e:
-            log.error(f"【Meta】连接TMDB出错：{str(e)}")
+            log.info(f"【Meta】连接TMDB出错：{str(e)}")
             return None
         log.debug(f"【Meta】API返回：{str(self.search.total_results)}")
         if len(multis) == 0:
@@ -1118,7 +1118,7 @@ class Media:
             tmdbinfo = self.movie.details(tmdbid, append_to_response)
             return tmdbinfo or {}
         except Exception as e:
-            print(str(e))
+            log.info(f"【Meta】：{str(e)}")
             return None
 
     def __get_tmdb_tv_detail(self, tmdbid, append_to_response=None):
@@ -1293,7 +1293,7 @@ class Media:
             tmdbinfo = self.tv.details(tmdbid, append_to_response)
             return tmdbinfo or {}
         except Exception as e:
-            print(str(e))
+            log.info(f"【Meta】：{str(e)}")
             return None
 
     def get_tmdb_tv_season_detail(self, tmdbid, season: int):
@@ -1367,7 +1367,7 @@ class Media:
             tmdbinfo = self.tv.season_details(tmdbid, season)
             return tmdbinfo or {}
         except Exception as e:
-            print(str(e))
+            log.info(f"【Meta】：{str(e)}")
             return {}
 
     def get_tmdb_tv_seasons_byid(self, tmdbid):
@@ -1779,7 +1779,7 @@ class Media:
             if movies:
                 return movies.get("results")
         except Exception as e:
-            print(str(e))
+            log.info(f"【Meta】：{str(e)}")
         return []
 
     def get_movie_similar(self, tmdbid, page=1):
@@ -1792,7 +1792,7 @@ class Media:
             movies = self.movie.similar(movie_id=tmdbid, page=page) or []
             return self.__dict_tmdbinfos(movies, MediaType.MOVIE)
         except Exception as e:
-            print(str(e))
+            log.info(f"【Meta】：{str(e)}")
             return []
 
     def get_movie_recommendations(self, tmdbid, page=1):
@@ -1805,7 +1805,7 @@ class Media:
             movies = self.movie.recommendations(movie_id=tmdbid, page=page) or []
             return self.__dict_tmdbinfos(movies, MediaType.MOVIE)
         except Exception as e:
-            print(str(e))
+            log.info(f"【Meta】：{str(e)}")
             return []
 
     def get_tv_similar(self, tmdbid, page=1):
@@ -1818,7 +1818,7 @@ class Media:
             tvs = self.tv.similar(tv_id=tmdbid, page=page) or []
             return self.__dict_tmdbinfos(tvs, MediaType.TV)
         except Exception as e:
-            print(str(e))
+            log.info(f"【Meta】：{str(e)}")
             return []
 
     def get_tv_recommendations(self, tmdbid, page=1):
@@ -1831,7 +1831,7 @@ class Media:
             tvs = self.tv.recommendations(tv_id=tmdbid, page=page) or []
             return self.__dict_tmdbinfos(tvs, MediaType.TV)
         except Exception as e:
-            print(str(e))
+            log.info(f"【Meta】：{str(e)}")
             return []
 
     def get_tmdb_discover(self, mtype, params=None, page=1):
@@ -1848,7 +1848,7 @@ class Media:
                 tvs = self.discover.discover_tv_shows(params=params, page=page)
                 return self.__dict_tmdbinfos(tvs, mtype)
         except Exception as e:
-            print(str(e))
+            log.info(f"【Meta】：{str(e)}")
         return []
 
     def get_person_medias(self, personid, mtype, page=1):
@@ -1867,7 +1867,7 @@ class Media:
                 result = self.__dict_tmdbinfos(tvs, mtype)
             return result[(page - 1) * 20: page * 20]
         except Exception as e:
-            print(str(e))
+            log.info(f"【Meta】：{str(e)}")
         return []
 
     @staticmethod

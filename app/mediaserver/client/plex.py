@@ -204,7 +204,7 @@ class Plex(_IMediaClient):
                            "library": item.librarySectionID,
                            "type": item.type,
                            "title": item.title,
-                           "year": item.year,
+                        #    "year": item.year, # 因有的媒体无year信息获取时会抛出异常且year暂无作用故注释
                            "json": str(item.__dict__)}
         except Exception as err:
             ExceptionUtils.exception_traceback(err)
