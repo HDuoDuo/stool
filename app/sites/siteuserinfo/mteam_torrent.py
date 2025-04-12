@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import log
+import time
+
 from app.sites.siteuserinfo._base import _ISiteUserInfo, SITE_BASE_ORDER
 from app.utils import RequestUtils
 from app.utils.types import SiteSchema
@@ -58,7 +60,7 @@ class MTeamTorrentUserInfo(_ISiteUserInfo):
         res = RequestUtils(
             headers={
                 'x-api-key': self._apikey,
-                "Content-Type": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
                 "User-Agent": self._ua,
                 "Accept": "application/json"
             },
@@ -104,7 +106,7 @@ class MTeamTorrentUserInfo(_ISiteUserInfo):
         res = RequestUtils(
             headers={
                 'x-api-key': self._apikey,
-                "Content-Type": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
                 "User-Agent": self._ua,
                 "Accept": "application/json"
             },
@@ -160,6 +162,8 @@ class MTeamTorrentUserInfo(_ISiteUserInfo):
         self.download = int(memberCount.get("downloaded", 0))
         # 拉取做种信息
         self._mt_get_seeding_info()
+        # 防止因拉取了做种信息立马拉取下载信息而致 请求过于频繁
+        time.sleep(1)
         # 拉取下载信息
         self._mt_get_leeching_info()
 

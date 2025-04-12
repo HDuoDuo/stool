@@ -32,7 +32,7 @@ class MTeamApi:
         start_time = datetime.now()
         site_url = MTeamApi.parse_api_domain(site_info.get("signurl")) + "/api/system/hello"
         headers = {
-            "Content-Type": "application/json; charset=UTF-8",
+            "Content-Type": "application/x-www-form-urlencoded",
             "User-Agent": site_info.get("ua"),
             "x-api-key": site_info.get("apikey"),
             "Accept": "application/json"
