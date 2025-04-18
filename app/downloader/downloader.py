@@ -221,12 +221,9 @@ class Downloader:
             # 合并TAG
             tags = download_attr.get("tags")
             if tags:
-                tags = tags.split(";")
-                if tag:
-                    tags.append(tag)
+                tags = tags.split(";").append(tag) if tag else tags.split(";")
             else:
-                if tag:
-                    tags = [tag]
+                tags = [tag] if tag else []
             # 布局
             content_layout = download_attr.get("content_layout")
             if content_layout == 1:
@@ -277,7 +274,7 @@ class Downloader:
                                              cookie=site_info.get("cookie"))
                 if ret:
                     # 把媒体二级目录category添加到labels标签中便于TR客户端管理
-                    tags.append(media_info.category)
+                    if media_info.category: tags.append(media_info.category)
                     downloader.change_torrent(tid=ret.id,
                                               tag=tags,
                                               upload_limit=upload_limit,

@@ -163,7 +163,7 @@ class MTeamTorrentUserInfo(_ISiteUserInfo):
         # 拉取做种信息
         self._mt_get_seeding_info()
         # 防止因拉取了做种信息立马拉取下载信息而致 请求过于频繁
-        time.sleep(1)
+        time.sleep(2)
         # 拉取下载信息
         self._mt_get_leeching_info()
 

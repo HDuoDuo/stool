@@ -186,13 +186,6 @@ class Transmission(_IDownloadClient):
             return
         else:
             ids = int(tid)
-        if tag:
-            if isinstance(tag, list):
-                labels = tag
-            else:
-                labels = [tag]
-        else:
-            labels = []
         if upload_limit:
             uploadLimited = True
             uploadLimit = int(upload_limit)
@@ -217,17 +210,21 @@ class Transmission(_IDownloadClient):
         else:
             seedIdleMode = 2
             seedIdleLimit = 0
+        kwargs = {"uploadLimited": uploadLimited,
+                  "uploadLimit": uploadLimit,
+                  "downloadLimited": downloadLimited,
+                  "downloadLimit": downloadLimit,
+                  "seedRatioMode": seedRatioMode,
+                  "seedRatioLimit": seedRatioLimit,
+                  "seedIdleMode": seedIdleMode,
+                  "seedIdleLimit": seedIdleLimit}
+        if tag:
+            if isinstance(tag, list):
+                kwargs["labels"] = tag
+            else:
+                kwargs["labels"] = [tag]
         try:
-            self.trc.change_torrent(ids=ids,
-                                    labels=labels,
-                                    uploadLimited=uploadLimited,
-                                    uploadLimit=uploadLimit,
-                                    downloadLimited=downloadLimited,
-                                    downloadLimit=downloadLimit,
-                                    seedRatioMode=seedRatioMode,
-                                    seedRatioLimit=seedRatioLimit,
-                                    seedIdleMode=seedIdleMode,
-                                    seedIdleLimit=seedIdleLimit)
+            self.trc.change_torrent(ids=ids, **kwargs)
         except Exception as err:
             ExceptionUtils.exception_traceback(err)
 
