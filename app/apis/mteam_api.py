@@ -92,7 +92,7 @@ class MTeamApi:
 
     # 拉取馒头字幕列表
     @staticmethod
-    def get_subtitle_list(base_url, torrentid, ua, apikey):
+    def get_subtitle_list(base_url, torrentid, ua, apikey, proxy=False):
         subtitle_list = []
         site_url = "%s/api/subtitle/list" % base_url
         res = RequestUtils(
@@ -102,6 +102,7 @@ class MTeamApi:
                 "User-Agent": ua,
                 "Accept": "application/json"
             },
+            proxies=Config().get_proxies() if proxy else None,
             timeout=30
         ).post_res(url=site_url, params=("id=%d" % torrentid))
         if res and res.status_code == 200:
@@ -125,7 +126,7 @@ class MTeamApi:
 
     # 下载单个馒头字幕
     @staticmethod
-    def download_single_subtitle(base_url, torrentid, subtitle_info, ua, apikey, download_dir):
+    def download_single_subtitle(base_url, torrentid, subtitle_info, ua, apikey, download_dir, proxy=False):
         subtitle_id = int(subtitle_info.get("id"))
         filename = subtitle_info.get("filename")
         # log.info(f"【Sites】开始下载馒头{torrentid}字幕 {filename}")
@@ -137,6 +138,7 @@ class MTeamApi:
                 "User-Agent": ua,
                 "Accept": "*/*"
             },
+            proxies=Config().get_proxies() if proxy else None,
             timeout=30
         ).get_res(site_url)
         if res and res.status_code == 200:
@@ -186,7 +188,7 @@ class MTeamApi:
 
     # 下载馒头字幕
     @staticmethod
-    def download_subtitle(media_info, site_id, cookie, ua, apikey, download_dir):
+    def download_subtitle(media_info, site_id, cookie, ua, apikey, download_dir, proxy=False):
         addr = parse.urlparse(media_info.page_url)
         log.info(f"【Sites】下载馒头字幕 {media_info.page_url}")
         # /detail/770**
@@ -199,10 +201,10 @@ class MTeamApi:
             log.warn(f"【MTeanApi】 获取馒头字幕失败, 未设置站点Api-Key")
             return
         base_url = MTeamApi.parse_api_domain(media_info.page_url)
-        subtitle_list = MTeamApi.get_subtitle_list(base_url, torrentid, ua, apikey)
+        subtitle_list = MTeamApi.get_subtitle_list(base_url, torrentid, ua, apikey, proxy)
         # 下载所有字幕文件
         for subtitle_info in subtitle_list:
-            MTeamApi.download_single_subtitle(base_url, torrentid, subtitle_info, ua, apikey, download_dir)
+            MTeamApi.download_single_subtitle(base_url, torrentid, subtitle_info, ua, apikey, download_dir, proxy)
 
     # 检查m-team种子属性
     @staticmethod
@@ -233,7 +235,7 @@ class MTeamApi:
                 "User-Agent": ua,
                 "Accept": "application/json"
             },
-            proxies=proxy,
+            proxies=Config().get_proxies() if proxy else None,
             timeout=30
         ).post_res(url=site_url, params=("id=%d" % torrentid))
         if res and res.status_code == 200:

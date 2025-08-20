@@ -318,7 +318,7 @@ class Downloader:
                             subtitle_dir = visit_dir
                         ThreadHelper().start_thread(
                             Subtitle().download_subtitle_from_site,
-                            (media_info, site_info.get("id"), site_info.get("cookie"), site_info.get("ua"), site_info.get("apikey"), subtitle_dir)
+                            (media_info, site_info.get("id"), site_info.get("cookie"), site_info.get("ua"), site_info.get("apikey"), subtitle_dir, site_info.get("proxy"))
                         )
                 return ret, ""
             else:
