@@ -41,7 +41,7 @@ class Torrent:
         if not os.path.exists(self._torrent_temp_path):
             os.makedirs(self._torrent_temp_path)
 
-    def get_torrent_info(self, url, cookie=None, ua=None, apikey=None, referer=None, proxy=False):
+    def get_torrent_info(self, url, cookie=None, ua=None, referer=None, proxy=False):
         """
         把种子下载到本地，返回种子内容
         :param url: 种子链接
@@ -61,7 +61,6 @@ class Torrent:
             file_path, content, errmsg = self.save_torrent_file(url=url,
                                                                 cookie=cookie,
                                                                 ua=ua,
-                                                                apikey=apikey,
                                                                 referer=referer,
                                                                 proxy=proxy)
             if not file_path:
@@ -74,7 +73,7 @@ class Torrent:
         except Exception as err:
             return None, None, "", [], "下载种子文件出现异常：%s" % str(err)
 
-    def save_torrent_file(self, url, cookie=None, ua=None, apikey=None, referer=None, proxy=False):
+    def save_torrent_file(self, url, cookie=None, ua=None, referer=None, proxy=False):
         """
         把种子下载到本地
         :return: 种子保存路径，错误信息
@@ -99,7 +98,7 @@ class Torrent:
             if not req.content:
                 return None, None, "未下载到种子数据"
             # 解析内容格式
-            if req.text and str(req.text).lower().startswith("magnet:"):
+            if req.content and str(req.content).lower().startswith("magnet:"):
                 return None, req.text, "磁力链接"
             else:
                 try:
@@ -118,6 +117,8 @@ class Torrent:
                 f.write(file_content)
         elif req is None:
             return None, None, "无法打开链接：%s" % url
+        elif req.status_code == 429:
+            return None, None, "触发站点流控，请稍后重试"
         else:
             return None, None, "下载种子出错，状态码：%s" % req.status_code
 

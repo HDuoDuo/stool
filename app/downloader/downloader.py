@@ -191,7 +191,6 @@ class Downloader:
                         url=url,
                         cookie=site_info.get("cookie"),
                         ua=site_info.get("ua"),
-                        apikey=site_info.get("apikey"),
                         referer=page_url if site_info.get("referer") else None,
                         proxy=site_info.get("proxy")
                     )
@@ -1059,7 +1058,6 @@ class Downloader:
             url=url,
             cookie=site_info.get("cookie"),
             ua=site_info.get("ua"),
-            apikey=site_info.get("apikey"),
             referer=page_url if site_info.get("referer") else None,
             proxy=site_info.get("proxy")
         )

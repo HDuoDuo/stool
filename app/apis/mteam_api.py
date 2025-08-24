@@ -57,37 +57,37 @@ class MTeamApi:
     def get_torrent_url_by_detail_url(base_url, detailurl, site_info):
         m = re.match(".+/detail/([0-9]+)", detailurl)
         if not m:
-            log.warn(f"【MTeanApi】 获取馒头种子连接失败 path：{detailurl}")
+            log.warn(f"【MTeamApi】 获取馒头种子连接失败 path：{detailurl}")
             return ""
         torrentid = int(m.group(1))
         apikey = site_info.get("apikey")
         if not apikey:
-            log.warn(f"【MTeanApi】 {torrentid}未设置站点Api-Key，无法获取种子连接")
+            log.warn(f"【MTeamApi】 {torrentid}未设置站点Api-Key，无法获取种子连接")
             return ""
         downloadurl = "%s/api/torrent/genDlToken" % MTeamApi.parse_api_domain(base_url)
         res = RequestUtils(
             headers={
                 "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json",
+                "Accept": "application/json, text/plain, */*",
                 "User-Agent": site_info.get("ua"),
                 "x-api-key": site_info.get("apikey"),
             },
             proxies=Config().get_proxies() if site_info.get("proxy") else None,
             timeout=30
-        ).post_res(url=downloadurl, params=("id=%d" % torrentid))
+        ).post_res(url=downloadurl, params={'id': torrentid})
         if res and res.status_code == 200:
             res_json = res.json()
             msg = res_json.get('message')
             torrent_url = res_json.get('data')
             if msg != "SUCCESS":
-                log.warn(f"【MTeanApi】 {torrentid}获取种子连接失败：{msg}")
+                log.warn(f"【MTeamApi】 {torrentid}获取种子连接失败：{msg}")
                 return ""
-            log.info(f"【MTeanApi】 {torrentid} 获取馒头种子连接成功: {torrent_url}")
+            log.info(f"【MTeamApi】 {torrentid} 获取馒头种子连接成功: {torrent_url}")
             return torrent_url
         elif res is not None:
-            log.warn(f"【MTeanApi】 {torrentid}获取种子连接失败，错误码：{res.status_code}")
+            log.warn(f"【MTeamApi】 {torrentid}获取种子连接失败，错误码：{res.status_code}")
         else:
-            log.warn(f"【MTeanApi】 {torrentid}获取种子连接失败，无法连接 {downloadurl}")
+            log.warn(f"【MTeamApi】 {torrentid}获取种子连接失败，无法连接 {downloadurl}")
         return ""
 
     # 拉取馒头字幕列表
@@ -108,7 +108,7 @@ class MTeamApi:
         if res and res.status_code == 200:
             msg = res.json().get('message')
             if msg != "SUCCESS":
-                log.warn(f"【MTeanApi】 获取馒头{torrentid}字幕列表失败：{msg}")
+                log.warn(f"【MTeamApi】 获取馒头{torrentid}字幕列表失败：{msg}")
                 return subtitle_list
             results = res.json().get('data', [])
             for result in results:
@@ -117,11 +117,11 @@ class MTeamApi:
                     "filename": result.get("filename"),
                 }
                 subtitle_list.append(subtitle)
-            log.info(f"【MTeanApi】 获取馒头{torrentid}字幕列表成功，捕获：{len(subtitle_list)}条字幕信息")
+            log.info(f"【MTeamApi】 获取馒头{torrentid}字幕列表成功，捕获：{len(subtitle_list)}条字幕信息")
         elif res is not None:
-            log.warn(f"【MTeanApi】 获取馒头{torrentid}字幕列表失败，错误码：{res.status_code}")
+            log.warn(f"【MTeamApi】 获取馒头{torrentid}字幕列表失败，错误码：{res.status_code}")
         else:
-            log.warn(f"【MTeanApi】 获取馒头{torrentid}字幕列表失败，无法连接 {site_url}")
+            log.warn(f"【MTeamApi】 获取馒头{torrentid}字幕列表失败，无法连接 {site_url}")
         return subtitle_list
 
     # 下载单个馒头字幕
@@ -148,7 +148,7 @@ class MTeamApi:
             # 保存ZIP
             file_name = filename
             if not file_name:
-                log.warn(f"【MTeanApi】 馒头{torrentid} 字幕文件非法：{subtitle_id}")
+                log.warn(f"【MTeamApi】 馒头{torrentid} 字幕文件非法：{subtitle_id}")
                 return
             save_tmp_path = Config().get_temp_path()
             if file_name.lower().endswith(".zip"):
@@ -164,7 +164,7 @@ class MTeamApi:
                 for sub_file in PathUtils.get_dir_files(in_path=zip_path, exts=RMT_SUBEXT):
                     target_sub_file = os.path.join(download_dir,
                                                    os.path.splitext(os.path.basename(sub_file))[0])
-                    log.info(f"【MTeanApi】 馒头{torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
+                    log.info(f"【MTeamApi】 馒头{torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
                     SiteHelper.transfer_subtitle(sub_file, target_sub_file)
                 # 删除临时文件
                 try:
@@ -179,12 +179,12 @@ class MTeamApi:
                     f.write(res.content)
                 target_sub_file = os.path.join(download_dir,
                                                os.path.splitext(os.path.basename(sub_file))[0])
-                log.info(f"【MTeanApi】 馒头{torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
+                log.info(f"【MTeamApi】 馒头{torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
                 SiteHelper.transfer_subtitle(sub_file, target_sub_file)
         elif res is not None:
-            log.warn(f"【MTeanApi】 下载馒头{torrentid}字幕 {filename} 失败，错误码：{res.status_code}")
+            log.warn(f"【MTeamApi】 下载馒头{torrentid}字幕 {filename} 失败，错误码：{res.status_code}")
         else:
-            log.warn(f"【MTeanApi】 下载馒头{torrentid}字幕 {filename} 失败，无法连接 {site_url}")
+            log.warn(f"【MTeamApi】 下载馒头{torrentid}字幕 {filename} 失败，无法连接 {site_url}")
 
     # 下载馒头字幕
     @staticmethod
@@ -194,11 +194,11 @@ class MTeamApi:
         # /detail/770**
         m = re.match("/detail/([0-9]+)", addr.path)
         if not m:
-            log.warn(f"【MTeanApi】 获取馒头字幕失败 path：{addr.path}")
+            log.warn(f"【MTeamApi】 获取馒头字幕失败 path：{addr.path}")
             return
         torrentid = int(m.group(1))
         if not apikey:
-            log.warn(f"【MTeanApi】 获取馒头字幕失败, 未设置站点Api-Key")
+            log.warn(f"【MTeamApi】 获取馒头字幕失败, 未设置站点Api-Key")
             return
         base_url = MTeamApi.parse_api_domain(media_info.page_url)
         subtitle_list = MTeamApi.get_subtitle_list(base_url, torrentid, ua, apikey, proxy)
@@ -221,11 +221,11 @@ class MTeamApi:
         # /detail/770**
         m = re.match("/detail/([0-9]+)", addr.path)
         if not m:
-            log.warn(f"【MTeanApi】 获取馒头种子属性失败 path：{addr.path}")
+            log.warn(f"【MTeamApi】 获取馒头种子属性失败 path：{addr.path}")
             return ret_attr
         torrentid = int(m.group(1))
         if not apikey:
-            log.warn(f"【MTeanApi】 获取馒头种子属性失败, 未设置站点Api-Key")
+            log.warn(f"【MTeamApi】 获取馒头种子属性失败, 未设置站点Api-Key")
             return ret_attr
         site_url = "%s/api/torrent/detail" % MTeamApi.parse_api_domain(torrent_url)
         res = RequestUtils(
@@ -241,7 +241,7 @@ class MTeamApi:
         if res and res.status_code == 200:
             msg = res.json().get('message')
             if msg != "SUCCESS":
-                log.warn(f"【MTeanApi】 获取馒头种子{torrentid}属性失败：{msg}")
+                log.warn(f"【MTeamApi】 获取馒头种子{torrentid}属性失败：{msg}")
                 return ret_attr
             result = res.json().get('data', {})
             status = result.get('status')
@@ -283,7 +283,7 @@ class MTeamApi:
                 ret_attr["uploadvolumefactor"] = 1.0
             # log.info(f"【SiteConf】获取馒头种子{torrentid}属性成功: {ret_attr}")
         elif res is not None:
-            log.warn(f"【MTeanApi】 获取馒头种子{torrentid}属性失败，错误码：{res.status_code}")
+            log.warn(f"【MTeamApi】 获取馒头种子{torrentid}属性失败，错误码：{res.status_code}")
         else:
-            log.warn(f"【MTeanApi】 获取馒头种子{torrentid}属性失败，无法连接 {site_url}")
+            log.warn(f"【MTeamApi】 获取馒头种子{torrentid}属性失败，无法连接 {site_url}")
         return ret_attr
