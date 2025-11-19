@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from lxml import etree
-
+import os
+from app.utils import SystemUtils
 
 class SiteHelper:
     @classmethod
@@ -29,3 +30,14 @@ class SiteHelper:
             return True
 
         return False
+    
+    @staticmethod
+    def transfer_subtitle(source_sub_file, media_file):
+        """
+        转移站点字幕
+        """
+        new_sub_file = "%s%s" % (os.path.splitext(media_file)[0], os.path.splitext(source_sub_file)[-1])
+        if os.path.exists(new_sub_file):
+            return 1
+        else:
+            return SystemUtils.copy(source_sub_file, new_sub_file)

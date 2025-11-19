@@ -7,7 +7,7 @@ from lxml import etree
 
 import log
 from app.conf import SiteConf
-from app.helper import OpenSubtitles
+from app.helper import OpenSubtitles, SiteHelper
 from app.utils import RequestUtils, PathUtils, SystemUtils, StringUtils, ExceptionUtils
 from app.utils.commons import singleton
 from app.utils.types import MediaType
@@ -147,7 +147,7 @@ class Subtitle:
                     shutil.unpack_archive(zip_file, zip_path, format='zip')
                     # 遍历转移文件
                     for sub_file in PathUtils.get_dir_files(in_path=zip_path, exts=RMT_SUBEXT):
-                        self.__transfer_subtitle(sub_file, Media_File)
+                        SiteHelper.transfer_subtitle(sub_file, Media_File)
                     # 删除临时文件
                     try:
                         shutil.rmtree(zip_path)
@@ -249,16 +249,6 @@ class Subtitle:
         else:
             return False, ret_msg
 
-    @staticmethod
-    def __transfer_subtitle(sub_file, media_file):
-        """
-        转移字幕
-        """
-        new_sub_file = "%s%s" % (os.path.splitext(media_file)[0], os.path.splitext(sub_file)[-1])
-        if os.path.exists(new_sub_file):
-            return 1
-        else:
-            return SystemUtils.copy(sub_file, new_sub_file)
 
     def download_subtitle_from_site(self, media_info, site_id, cookie, ua, apikey, download_dir, proxy=False):
         """
@@ -330,7 +320,7 @@ class Subtitle:
                             target_sub_file = os.path.join(download_dir,
                                                            os.path.splitext(os.path.basename(sub_file))[0])
                             log.info(f"【Subtitle】转移字幕 {sub_file} 到 {target_sub_file}")
-                            self.__transfer_subtitle(sub_file, target_sub_file)
+                            SiteHelper.transfer_subtitle(sub_file, target_sub_file)
                         # 删除临时文件
                         try:
                             shutil.rmtree(zip_path)
@@ -345,7 +335,7 @@ class Subtitle:
                         target_sub_file = os.path.join(download_dir,
                                                        os.path.splitext(os.path.basename(sub_file))[0])
                         log.info(f"【Subtitle】转移字幕 {sub_file} 到 {target_sub_file}")
-                        self.__transfer_subtitle(sub_file, target_sub_file)
+                        SiteHelper.transfer_subtitle(sub_file, target_sub_file)
                 else:
                     log.error(f"【Subtitle】下载字幕文件失败：{sublink}")
                     continue
