@@ -317,8 +317,7 @@ class Subtitle:
                         shutil.unpack_archive(zip_file, zip_path, format='zip')
                         # 遍历转移文件
                         for sub_file in PathUtils.get_dir_files(in_path=zip_path, exts=RMT_SUBEXT):
-                            target_sub_file = os.path.join(download_dir,
-                                                           os.path.splitext(os.path.basename(sub_file))[0])
+                            target_sub_file = os.path.join(download_dir,os.path.basename(sub_file))
                             log.info(f"【Subtitle】转移字幕 {sub_file} 到 {target_sub_file}")
                             SiteHelper.transfer_subtitle(sub_file, target_sub_file)
                         # 删除临时文件
@@ -332,8 +331,7 @@ class Subtitle:
                         # 保存
                         with open(sub_file, 'wb') as f:
                             f.write(ret.content)
-                        target_sub_file = os.path.join(download_dir,
-                                                       os.path.splitext(os.path.basename(sub_file))[0])
+                        target_sub_file = os.path.join(download_dir,os.path.basename(sub_file))
                         log.info(f"【Subtitle】转移字幕 {sub_file} 到 {target_sub_file}")
                         SiteHelper.transfer_subtitle(sub_file, target_sub_file)
                 else:

@@ -92,7 +92,7 @@ class MTeamApi:
 
     # 拉取馒头字幕列表
     @staticmethod
-    def get_subtitle_list(base_url, torrentid, ua, apikey, proxy=False):
+    def get_subtitle_list(base_url, torrentid, ua, apikey, meta_name, proxy=False):
         subtitle_list = []
         site_url = "%s/api/subtitle/list" % base_url
         res = RequestUtils(
@@ -115,6 +115,8 @@ class MTeamApi:
                 subtitle = {
                     "id": result.get("id"),
                     "filename": result.get("filename"),
+                    "lang": result.get("lang"),
+                    "metaname": meta_name
                 }
                 subtitle_list.append(subtitle)
             log.info(f"【MTeamApi】 获取馒头{torrentid}字幕列表成功，捕获：{len(subtitle_list)}条字幕信息")
@@ -127,10 +129,11 @@ class MTeamApi:
     # 下载单个馒头字幕
     @staticmethod
     def download_single_subtitle(base_url, torrentid, subtitle_info, ua, apikey, download_dir, proxy=False):
-        subtitle_id = int(subtitle_info.get("id"))
+        subtitle_id = subtitle_info.get("id")
         filename = subtitle_info.get("filename")
-        # log.info(f"【Sites】开始下载馒头{torrentid}字幕 {filename}")
-        site_url = "%s/api/subtitle/dl?id=%d" % (base_url, subtitle_id)
+        lang = subtitle_info.get("lang")
+        meta_name = subtitle_info.get("metaname")
+        site_url = "%s/api/subtitle/dl?id=%d" % (base_url, int(subtitle_id))
         res = RequestUtils(
             headers={
                 'x-api-key': apikey,
@@ -146,12 +149,16 @@ class MTeamApi:
             if not os.path.exists(download_dir):
                 os.makedirs(download_dir, exist_ok=True)
             # 保存ZIP
-            file_name = filename
+            spli_filename = os.path.splitext(filename)
+            if meta_name:
+                file_name = (meta_name+'.'+subtitle_id+'.chi'+spli_filename[-1]) if lang == "25" else (meta_name+'.'+subtitle_id+spli_filename[-1])
+            else:
+                file_name = (spli_filename[0]+'.chi'+spli_filename[-1]) if lang == "25" and ".chi." not in filename else filename
             if not file_name:
                 log.warn(f"【MTeamApi】 馒头{torrentid} 字幕文件非法：{subtitle_id}")
                 return
             save_tmp_path = Config().get_temp_path()
-            if file_name.lower().endswith(".zip"):
+            if file_name.lower().endswith((".zip", ".tar")):
                 # ZIP包
                 zip_file = os.path.join(save_tmp_path, file_name)
                 # 解压路径
@@ -159,11 +166,10 @@ class MTeamApi:
                 with open(zip_file, 'wb') as f:
                     f.write(res.content)
                 # 解压文件
-                shutil.unpack_archive(zip_file, zip_path, format='zip')
+                shutil.unpack_archive(zip_file, zip_path)
                 # 遍历转移文件
                 for sub_file in PathUtils.get_dir_files(in_path=zip_path, exts=RMT_SUBEXT):
-                    target_sub_file = os.path.join(download_dir,
-                                                   os.path.splitext(os.path.basename(sub_file))[0])
+                    target_sub_file = os.path.join(download_dir,os.path.basename(sub_file))
                     log.info(f"【MTeamApi】 馒头{torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
                     SiteHelper.transfer_subtitle(sub_file, target_sub_file)
                 # 删除临时文件
@@ -177,8 +183,7 @@ class MTeamApi:
                 # 保存
                 with open(sub_file, 'wb') as f:
                     f.write(res.content)
-                target_sub_file = os.path.join(download_dir,
-                                               os.path.splitext(os.path.basename(sub_file))[0])
+                target_sub_file = os.path.join(download_dir,os.path.basename(sub_file))
                 log.info(f"【MTeamApi】 馒头{torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
                 SiteHelper.transfer_subtitle(sub_file, target_sub_file)
         elif res is not None:
@@ -201,7 +206,8 @@ class MTeamApi:
             log.warn(f"【MTeamApi】 获取馒头字幕失败, 未设置站点Api-Key")
             return
         base_url = MTeamApi.parse_api_domain(media_info.page_url)
-        subtitle_list = MTeamApi.get_subtitle_list(base_url, torrentid, ua, apikey, proxy)
+        log.info(f"下载字幕的媒体名称 {media_info.cn_name}")
+        subtitle_list = MTeamApi.get_subtitle_list(base_url, torrentid, ua, apikey, media_info.get_name(), proxy)
         # 下载所有字幕文件
         for subtitle_info in subtitle_list:
             MTeamApi.download_single_subtitle(base_url, torrentid, subtitle_info, ua, apikey, download_dir, proxy)
