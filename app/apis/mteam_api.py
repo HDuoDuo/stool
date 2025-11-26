@@ -206,7 +206,6 @@ class MTeamApi:
             log.warn(f"【MTeamApi】 获取馒头字幕失败, 未设置站点Api-Key")
             return
         base_url = MTeamApi.parse_api_domain(media_info.page_url)
-        log.info(f"下载字幕的媒体名称 {media_info.cn_name}")
         subtitle_list = MTeamApi.get_subtitle_list(base_url, torrentid, ua, apikey, media_info.get_name(), proxy)
         # 下载所有字幕文件
         for subtitle_info in subtitle_list:

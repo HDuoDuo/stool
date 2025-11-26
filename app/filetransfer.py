@@ -226,8 +226,6 @@ class FileTransfer:
                                        flags=re.I)
                 sub_file_name = re.sub(_eng_sub_re, ".", sub_file_name, flags=re.I)
                 sub_metainfo = MetaInfo(title=os.path.splitext(os.path.basename(sub_file_name))[0])
-                log.info(f"字幕转移相关。。。sub_file_name={sub_file_name},file_item={file_item},file_name={file_name}")
-                log.info(f"字幕转移相关。。。sub_metainfo.cn_name={sub_metainfo.cn_name},metainfo.cn_name={metainfo.cn_name},sub_metainfo.en_name={sub_metainfo.en_name},metainfo.en_name={metainfo.en_name}")
                 if (os.path.splitext(file_name)[0] == os.path.splitext(sub_file_name)[0]) or \
                         (sub_metainfo.cn_name and sub_metainfo.cn_name == metainfo.cn_name) \
                         or (sub_metainfo.en_name and sub_metainfo.en_name == metainfo.en_name):
