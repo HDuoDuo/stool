@@ -2,12 +2,10 @@ import base64
 import json
 from typing import List, Optional, Tuple
 
-from app.core.config import settings
-from app.db.systemconfig_oper import SystemConfigOper
-from app.log import logger
-from app.schemas import MediaType
-from app.utils.http import RequestUtils, AsyncRequestUtils
-from app.utils.string import StringUtils
+from config import Config
+import log as logger
+from app.utils.types import MediaType
+from app.utils import RequestUtils, StringUtils
 
 
 class RousiSpider:
@@ -40,20 +38,18 @@ class RousiSpider:
     _apikey = None
 
     def __init__(self, indexer: dict):
-        self.systemconfig = SystemConfigOper()
         if indexer:
-            self._indexerid = indexer.get('id')
-            self._url = indexer.get('domain')
+            self._indexerid = indexer.id
+            self._url = indexer.domain
             self._domain = StringUtils.get_url_domain(self._url)
             self._searchurl = self._searchurl % self._domain
             self._downloadurl = self._downloadurl % (self._domain, "%s")
-            self._name = indexer.get('name')
-            if indexer.get('proxy'):
-                self._proxy = settings.PROXY
-            self._cookie = indexer.get('cookie')
-            self._ua = indexer.get('ua')
-            self._apikey = indexer.get('apikey')
-            self._timeout = indexer.get('timeout') or 15
+            self._name = indexer.name
+            if indexer.proxy:
+                self._proxy = Config().get_proxies()
+            self._cookie = indexer.cookie
+            self._ua = indexer.ua
+            self._apikey = indexer.apikey
 
     def __get_params(self, keyword: str, mtype: MediaType = None, cat: Optional[str] = None, page: Optional[int] = 0) -> dict:
         """
@@ -233,35 +229,36 @@ class RousiSpider:
             timeout=self._timeout
         ).get_res(url=self._searchurl, params=params)
 
-        return self.__process_response(res)
+        _, result= self.__process_response(res)
+        return result
 
-    async def async_search(self, keyword: str, mtype: MediaType = None, cat: Optional[str] = None, page: Optional[int] = 0) -> Tuple[bool, List[dict]]:
-        """
-        异步搜索种子
+    # async def async_search(self, keyword: str, mtype: MediaType = None, cat: Optional[str] = None, page: Optional[int] = 0) -> Tuple[bool, List[dict]]:
+    #     """
+    #     异步搜索种子
 
-        :param keyword: 搜索关键词
-        :param mtype: 媒体类型 (MOVIE/TV)
-        :param cat: 用户选择的分类 ID（逗号分隔）
-        :param page: 页码（从 0 开始）
-        :return: (是否发生错误, 种子列表)
-        """
-        if not self._apikey:
-            logger.warn(f"{self._name} 未配置 API Key (Passkey)")
-            return True, []
+    #     :param keyword: 搜索关键词
+    #     :param mtype: 媒体类型 (MOVIE/TV)
+    #     :param cat: 用户选择的分类 ID（逗号分隔）
+    #     :param page: 页码（从 0 开始）
+    #     :return: (是否发生错误, 种子列表)
+    #     """
+    #     if not self._apikey:
+    #         logger.warn(f"{self._name} 未配置 API Key (Passkey)")
+    #         return True, []
 
-        params = self.__get_params(keyword, mtype, cat, page)
-        headers = {
-            "Authorization": f"Bearer {self._apikey}",
-            "Accept": "application/json"
-        }
+    #     params = self.__get_params(keyword, mtype, cat, page)
+    #     headers = {
+    #         "Authorization": f"Bearer {self._apikey}",
+    #         "Accept": "application/json"
+    #     }
 
-        res = await AsyncRequestUtils(
-            headers=headers,
-            proxies=self._proxy,
-            timeout=self._timeout
-        ).get_res(url=self._searchurl, params=params)
+    #     res = await AsyncRequestUtils(
+    #         headers=headers,
+    #         proxies=self._proxy,
+    #         timeout=self._timeout
+    #     ).get_res(url=self._searchurl, params=params)
 
-        return self.__process_response(res)
+    #     return self.__process_response(res)
 
     def __get_download_url(self, torrent_id: int) -> str:
         """
@@ -283,7 +280,8 @@ class RousiSpider:
                 'Authorization': f'Bearer {self._apikey}',
                 'Accept': 'application/json'
             },
-            'result': 'data.download_url'
+            'result': 'data.download_url',
+            'proxy': f'{self._proxy}'
         }
         base64_str = base64.b64encode(json.dumps(params).encode('utf-8')).decode('utf-8')
         return f"[{base64_str}]{url}"

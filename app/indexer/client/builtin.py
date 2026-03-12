@@ -10,6 +10,7 @@ from app.indexer.client._render_spider import RenderSpider
 from app.indexer.client._spider import TorrentSpider
 from app.indexer.client._tnode import TNodeSpider
 from app.indexer.client._mt_spider import MTSpider
+from app.indexer.client._rousi import RousiSpider
 from app.sites import Sites
 from app.utils import StringUtils
 from app.utils.types import SearchType, IndexerType
@@ -156,8 +157,10 @@ class BuiltinIndexer(_IIndexClient):
             if indexer.parser == "Rarbg":
                 imdb_id = match_media.imdb_id if match_media else None
                 result_array = Rarbg().search(keyword=search_word, indexer=indexer, imdb_id=imdb_id)
-            elif 'm-team' in indexer.domain:
+            elif indexer.parser == "MTSpider":
                 result_array = MTSpider(indexer).search(keyword=search_word)
+            elif indexer.parser == "RousiPro":
+                result_array = RousiSpider(indexer).search(keyword=search_word)
             elif indexer.parser == "TNodeSpider":
                 result_array = TNodeSpider(indexer=indexer).search(keyword=search_word)
             elif indexer.parser == "RenderSpider":
@@ -192,8 +195,10 @@ class BuiltinIndexer(_IIndexClient):
         indexer: IndexerConf = self.get_indexers(indexer_id=index_id)
         if not indexer:
             return []
-        if 'm-team' in indexer.domain:
+        if indexer.parser == "MTSpider":
             return MTSpider(indexer).search(keyword=keyword, page=page)
+        elif indexer.parser == "RousiPro":
+            return RousiSpider(indexer).search(keyword=keyword, page=page)
         elif indexer.parser == "RenderSpider":
             return RenderSpider().search(keyword=keyword,
                                          indexer=indexer,

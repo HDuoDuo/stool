@@ -2,64 +2,43 @@
 import json
 import re
 from abc import ABCMeta, abstractmethod
-from enum import Enum
 from typing import Optional
 from urllib.parse import urljoin, urlsplit
 
 from requests import Session
 
-from app.core.config import settings
-from app.helper.cloudflare import under_challenge
-from app.log import logger
-from app.utils.http import RequestUtils
-from app.utils.site import SiteUtils
-
-
-# 站点框架
-class SiteSchema(Enum):
-    DiscuzX = "DiscuzX"
-    Gazelle = "Gazelle"
-    Ipt = "IPTorrents"
-    NexusPhp = "NexusPhp"
-    NexusProject = "NexusProject"
-    NexusRabbit = "NexusRabbit"
-    NexusHhanclub = "NexusHhanclub"
-    NexusAudiences = "NexusAudiences"
-    SmallHorse = "Small Horse"
-    Unit3d = "Unit3d"
-    TorrentLeech = "TorrentLeech"
-    FileList = "FileList"
-    TNode = "TNode"
-    MTorrent = "MTorrent"
-    Yema = "Yema"
-    HDDolby = "HDDolby"
-    Zhixing = "Zhixing"
-    Bitpt = "Bitpt"
-    RousiPro = "RousiPro"
+from config import Config
+import log as logger
+from app.utils import RequestUtils
+from app.helper import site_helper
+from app.utils.types import SiteSchema
 
 
 class SiteParserBase(metaclass=ABCMeta):
     # 站点模版
     schema = None
+    # 站点解析时判断顺序，值越小越先解析
+    order = 1000
     # 请求模式 cookie/apikey
     request_mode = "cookie"
 
     def __init__(self, site_name: str,
                  url: str,
                  site_cookie: str,
-                 apikey: str,
-                 token: str,
+                 index_html: str,
+                 token: str = None,
                  session: Session = None,
                  ua: Optional[str] = None,
+                 apikey: str = None,
                  emulate: bool = False,
                  proxy: bool = None):
         super().__init__()
 
         # 站点信息
-        self.apikey = apikey
-        self.token = token
-        self._site_name = site_name
-        self._site_url = url
+        self._apikey = apikey
+        self.token = token or site_cookie
+        self.site_name = site_name
+        self.site_url = url
         __split_url = urlsplit(url)
         self._site_domain = __split_url.netloc
         self._base_url = f"{__split_url.scheme}://{__split_url.netloc}"
@@ -68,7 +47,8 @@ class SiteParserBase(metaclass=ABCMeta):
         self._ua = ua
         self._emulate = emulate
         self._proxy = proxy
-        self._index_html = ""
+        self._index_html = index_html
+        self.site_favicon = None
         # 用户信息
         self.username = None
         self.userid = None
@@ -153,6 +133,15 @@ class SiteParserBase(metaclass=ABCMeta):
         :return: 站点解析模型
         """
         return self.schema
+    
+    @classmethod
+    def match(cls, html_text):
+        """
+        是否匹配当前解析模型
+        :param html_text: 站点首页html
+        :return: 是否匹配
+        """
+        return False
 
     def parse(self):
         """
@@ -162,13 +151,13 @@ class SiteParserBase(metaclass=ABCMeta):
         try:
             # Cookie模式时，获取站点首页html
             if self.request_mode == "apikey":
-                if not self.apikey and not self.token:
-                    logger.warn(f"{self._site_name} 未设置cookie 或 apikey/token，跳过后续操作")
+                if not self._apikey and not self.token:
+                    logger.warn(f"{self.site_name} 未设置cookie 或 apikey/token，跳过后续操作")
                     return
                 self._index_html = {}
             else:
                 # 检查是否已经登录
-                self._index_html = self._get_page_content(url=self._site_url)
+                self._index_html = self._get_page_content(url=self.site_url)
                 if not self._parse_logged_in(self._index_html):
                     return
             # 解析站点页面
@@ -193,9 +182,7 @@ class SiteParserBase(metaclass=ABCMeta):
                         headers=self._user_detail_headers
                     )
                 )
-            # 解析用户未读消息
-            if settings.SITE_MESSAGE:
-                self._pase_unread_msgs()
+            self._pase_unread_msgs()
             # 解析用户上传、下载、分享率等信息
             if self._user_traffic_page:
                 self._parse_user_traffic_info(
@@ -245,7 +232,7 @@ class SiteParserBase(metaclass=ABCMeta):
             self.message_unread = len(unread_msg_links)
         # 解析未读消息内容
         for msg_link in unread_msg_links:
-            logger.debug(f"{self._site_name} 信息链接 {msg_link}")
+            logger.debug(f"{self.site_name} 信息链接 {msg_link}")
             head, date, content = self._parse_message_content(
                 self._get_page_content(
                     urljoin(self._base_url, msg_link),
@@ -253,7 +240,7 @@ class SiteParserBase(metaclass=ABCMeta):
                     headers=self._mail_content_headers
                 )
             )
-            logger.debug(f"{self._site_name} 标题 {head} 时间 {date} 内容 {content}")
+            logger.debug(f"{self.site_name} 标题 {head} 时间 {date} 内容 {content}")
             self.message_unread_contents.append((head, date, content))
 
     def _parse_seeding_pages(self):
@@ -305,7 +292,7 @@ class SiteParserBase(metaclass=ABCMeta):
         :return:
         """
         req_headers = None
-        proxies = settings.PROXY if self._proxy else None
+        proxies = Config().get_proxies() if self._proxy else None
         if self._ua or headers or self._addition_headers:
 
             if self.request_mode == "apikey":
@@ -346,7 +333,7 @@ class SiteParserBase(metaclass=ABCMeta):
                                    session=session,
                                    timeout=60,
                                    proxies=proxies,
-                                   headers=req_headers).post_res(url=url, data=params)
+                                   headers=req_headers).post_res(url=url, params=params)
         else:
             res = RequestUtils(cookies=cookie,
                                session=session,
@@ -358,17 +345,8 @@ class SiteParserBase(metaclass=ABCMeta):
                 try:
                     return json.dumps(res.json())
                 except (json.JSONDecodeError, ValueError) as e:
-                    logger.error(f"{self._site_name} API响应JSON解析失败: {e}")
+                    logger.error(f"{self.site_name} API响应JSON解析失败: {e}")
                     return ""
-            else:
-                # 如果cloudflare 有防护，尝试使用浏览器仿真
-                if under_challenge(res.text):
-                    logger.warn(
-                        f"{self._site_name} 检测到Cloudflare，请更新Cookie和UA")
-                    return ""
-                return RequestUtils.get_decoded_html_content(res,
-                                                             settings.ENCODING_DETECTION_PERFORMANCE_MODE,
-                                                             settings.ENCODING_DETECTION_MIN_CONFIDENCE)
 
         return ""
 
@@ -396,10 +374,10 @@ class SiteParserBase(metaclass=ABCMeta):
         :param html_text:
         :return: True/False
         """
-        logged_in = SiteUtils.is_logged_in(html_text)
+        logged_in = site_helper.is_logged_in(html_text)
         if not logged_in:
             self.err_msg = "未检测到已登陆，请检查cookies是否过期"
-            logger.warn(f"{self._site_name} 未登录，跳过后续操作")
+            logger.warn(f"{self.site_name} 未登录，跳过后续操作")
 
         return logged_in
 

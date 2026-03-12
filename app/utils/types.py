@@ -94,6 +94,8 @@ class SiteSchema(Enum):
     FileList = "FileList"
     TNode = "TNode"
     MTeamTorrent = "MTeamTorrent"
+    RousiPro = "RousiPro"
+    MTorrent = "MTorrent"
 
 
 MovieTypes = ['MOV', '电影']

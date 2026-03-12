@@ -3,11 +3,12 @@ import json
 from urllib.parse import urljoin
 from typing import Optional, Tuple
 
-from app.log import logger
-from app.core.config import settings
-from app.utils.http import RequestUtils
-from app.utils.string import StringUtils
-from app.modules.indexer.parser import SiteParserBase, SiteSchema
+import log  as logger
+from config import Config
+from app.utils import RequestUtils, StringUtils
+from app.sites.siteuserinfo._base import SITE_BASE_ORDER
+from app.sites.siteuserinfo import SiteParserBase
+from app.utils.types import SiteSchema
 
 
 class RousiSiteUserInfo(SiteParserBase):
@@ -16,20 +17,26 @@ class RousiSiteUserInfo(SiteParserBase):
     使用 API v1 接口，通过 Passkey (Bearer Token) 进行认证
     """
     schema = SiteSchema.RousiPro
+    order = SITE_BASE_ORDER + 50
     request_mode = "apikey"
+
+    @classmethod
+    def match(cls, html_text):
+        # 馒头手动绑定
+        return 'Rousi Pro' in html_text
 
     def _parse_site_page(self, html_text: str):
         """
         配置 API 请求地址和请求头
         使用 API v1 的 /profile 接口获取用户信息
         """
-        self._base_url = f"https://{StringUtils.get_url_domain(self._site_url)}"
+        self._base_url = f'https://{StringUtils.get_url_domain(self.site_url)}'
         self._user_basic_page = "api/v1/profile?include_fields[user]=seeding_leeching_data"
         self._user_basic_params = {}
         self._user_basic_headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "Authorization": f"Bearer {self.apikey}"
+            "Authorization": f'Bearer {self._apikey}'
         }
 
         # Rousi.pro API v1 在单个接口返回所有信息，无需额外页面
@@ -79,12 +86,12 @@ class RousiSiteUserInfo(SiteParserBase):
         try:
             data = json.loads(html_text)
         except json.JSONDecodeError:
-            logger.error(f"{self._site_name} JSON 解析失败")
+            logger.error(f'{self.site_name} JSON 解析失败')
             return
 
         if not data or data.get("code") != 0:
             self.err_msg = data.get("message", "未知错误")
-            logger.warn(f"{self._site_name} API 错误: {self.err_msg}")
+            logger.warn(f'{self.site_name} API 错误: {self.err_msg}')
             return
 
         user_info = data.get("data")
@@ -174,7 +181,7 @@ class RousiSiteUserInfo(SiteParserBase):
         :return:
         """
         if not self.token:
-            logger.warn(f"{self._site_name} 站点未配置 Authorization 请求头，跳过消息解析")
+            logger.warn(f'{self.site_name} 站点未配置 Authorization 请求头，跳过消息解析')
             return
         
         headers = {
@@ -192,13 +199,13 @@ class RousiSiteUserInfo(SiteParserBase):
             res = RequestUtils(
                 headers=headers,
                 timeout=60,
-                proxies=settings.PROXY if self._proxy else None
+                proxies=Config().get_proxies() if self._proxy else None
             ).get_res(
                 url=urljoin(self._base_url, "api/messages"),
                 params=params
             )
             if not res or res.status_code != 200 or res.json().get("code", -1) != 0:
-                logger.warn(f"{self._site_name} 站点解析消息失败，状态码: {res.status_code if res else '无响应'}")
+                logger.warn(f'{self.site_name} 站点解析消息失败，状态码: {res.status_code if res else "无响应"}')
                 return {
                     "messages": [],
                     "total_pages": 0
@@ -221,14 +228,14 @@ class RousiSiteUserInfo(SiteParserBase):
             head = messsage.get("title")
             date = StringUtils.unify_datetime_str(messsage.get("created_at"))
             content = messsage.get("content")
-            logger.debug(f"{self._site_name} 标题 {head} 时间 {date} 内容 {content}")
+            logger.debug(f'{self.site_name} 标题 {head} 时间 {date} 内容 {content}')
             self.message_unread_contents.append((head, date, content))
             
         # 更新消息为已读
         RequestUtils(
             headers=headers,
             timeout=60,
-            proxies=settings.PROXY if self._proxy else None
+            proxies=Config().get_proxies() if self._proxy else None
         ).post_res(
             url=urljoin(self._base_url, "api/messages/read-all")
         )

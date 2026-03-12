@@ -1,4 +1,8 @@
 import os
+import re
+import base64
+import json
+from typing import Dict
 from threading import Lock
 
 import log
@@ -12,7 +16,7 @@ from app.message import Message
 from app.sites import Sites
 from app.subtitle import Subtitle
 from app.conf import SystemConfig
-from app.utils import Torrent, StringUtils, SystemUtils, ExceptionUtils
+from app.utils import Torrent, StringUtils, SystemUtils, ExceptionUtils, RequestUtils
 from app.utils.commons import singleton
 from app.utils.types import MediaType, DownloaderType, SearchType, RmtMode
 from config import Config, PT_TAG, RMT_MEDIAEXT
@@ -136,6 +140,59 @@ class Downloader:
         :param torrent_file: 种子文件路径
         :return: 种子或状态，错误信息
         """
+        def __get_redict_url(url: str):
+            """
+            获取下载链接， url格式：[base64]url
+            """
+            # 获取[]中的内容
+            m = re.search(r"\[(.*)](.*)", url)
+            if m:
+                # 参数
+                base64_str = m.group(1)
+                # URL
+                url = m.group(2)
+                if not base64_str:
+                    return url
+                # 解码参数
+                req_str = base64.b64decode(base64_str.encode('utf-8')).decode('utf-8')
+                req_params: Dict[str, dict] = json.loads(req_str)
+                # 是否使用cookie
+                if not req_params.get('cookie'):
+                    cookie = None
+                # 代理
+                proxy = req_params.get('proxy')
+                # 请求头
+                if req_params.get('header'):
+                    headers = req_params.get('header')
+                else:
+                    headers = None
+                if req_params.get('method') == 'get':
+                    # GET请求
+                    res = RequestUtils(
+                        cookies=cookie,
+                        headers=headers,
+                        proxies=Config().get_proxies() if proxy else None
+                    ).get_res(url, params=req_params.get('params'))
+                else:
+                    # POST请求
+                    res = RequestUtils(
+                        cookies=cookie,
+                        headers=headers,
+                        proxies=Config().get_proxies() if proxy else None
+                    ).post_res(url, params=req_params.get('params'))
+                if not res:
+                    return None
+                if not req_params.get('result'):
+                    return res.text
+                else:
+                    data = res.json()
+                    for key in str(req_params.get('result')).split("."):
+                        data = data.get(key)
+                        if not data:
+                            return None
+                    log.info(f"获取到下载地址：{data}")
+                    return data
+            return None
         # 标题
         title = media_info.org_string
         # 详情页面
@@ -161,8 +218,10 @@ class Downloader:
             else:
                 # [XPATH]为需从详情页面解析磁力链
                 if url.startswith("["):
-                    _xpath = url[1:-1]
-                    url = page_url
+                    # 若能解码获取下载地址则不需在详情页解析下载链接
+                    res_redict_url = __get_redict_url(url=url)
+                    _xpath = None if res_redict_url else url[1:-1]
+                    url = res_redict_url or page_url
                 # #XPATH#为需从详情页面解析磁力Hash
                 elif url.startswith("#"):
                     _xpath = url[1:-1]
