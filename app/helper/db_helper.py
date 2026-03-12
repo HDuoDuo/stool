@@ -1324,7 +1324,7 @@ class DbHelper:
                     {
                         "SITE": site_user_info.site_name,
                         "UPDATE_AT": update_at,
-                        "SEEDING_INFO": site_user_info.seeding_info
+                        "SEEDING_INFO": f'{site_user_info.seeding_info}'
                     }
                 )
 
