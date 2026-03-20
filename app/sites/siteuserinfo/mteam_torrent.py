@@ -31,10 +31,12 @@ class MTeamSysRole(object):
 class MTeamTorrentUserInfo(_ISiteUserInfo):
     schema = SiteSchema.MTeamTorrent
     order = SITE_BASE_ORDER + 100
+    request_mode = "apikey"
 
     @classmethod
     def match(cls, html_text):
         # 馒头手动绑定
+        # return 'M-Team' in html_text
         return False
 
     def _parse_logged_in(self, html_text):

@@ -22,7 +22,6 @@ from app.utils.types import MediaType, DownloaderType, SearchType, RmtMode
 from config import Config, PT_TAG, RMT_MEDIAEXT
 from app.indexer import Indexer
 from app.utils.types import IndexerType
-from app.apis import MTeamApi
 
 lock = Lock()
 client_lock = Lock()
@@ -123,6 +122,60 @@ class Downloader:
                 self.clients[ctype.value] = self.__build_class(ctype.value, conf)
             return self.clients.get(ctype.value)
 
+    def __get_redict_url(self, url: str):
+        """
+        获取下载链接， url格式：[base64]url
+        """
+        # 获取[]中的内容
+        m = re.search(r"\[(.*)](.*)", url)
+        if m:
+            # 参数
+            base64_str = m.group(1)
+            # URL
+            url = m.group(2)
+            if not base64_str:
+                return url
+            # 解码参数
+            req_str = base64.b64decode(base64_str.encode('utf-8')).decode('utf-8')
+            req_params: Dict[str, dict] = json.loads(req_str)
+            # 是否使用cookie
+            if not req_params.get('cookie'):
+                cookie = None
+            # 代理
+            proxy = req_params.get('proxy')
+            # 请求头
+            if req_params.get('header'):
+                headers = req_params.get('header')
+            else:
+                headers = None
+            if req_params.get('method') == 'get':
+                # GET请求
+                res = RequestUtils(
+                    cookies=cookie,
+                    headers=headers,
+                    proxies=Config().get_proxies() if proxy else None
+                ).get_res(url, params=req_params.get('params'))
+            else:
+                # POST请求
+                res = RequestUtils(
+                    cookies=cookie,
+                    headers=headers,
+                    proxies=Config().get_proxies() if proxy else None
+                ).post_res(url, params=req_params.get('params'))
+            if not res:
+                return None
+            if not req_params.get('result'):
+                return res.text
+            else:
+                data = res.json()
+                for key in str(req_params.get('result')).split("."):
+                    data = data.get(key)
+                    if not data:
+                        return None
+                log.debug(f"【Downloader】获取到下载地址：{data}")
+                return data
+        return None
+
     def download(self,
                  media_info,
                  is_paused=None,
@@ -140,59 +193,6 @@ class Downloader:
         :param torrent_file: 种子文件路径
         :return: 种子或状态，错误信息
         """
-        def __get_redict_url(url: str):
-            """
-            获取下载链接， url格式：[base64]url
-            """
-            # 获取[]中的内容
-            m = re.search(r"\[(.*)](.*)", url)
-            if m:
-                # 参数
-                base64_str = m.group(1)
-                # URL
-                url = m.group(2)
-                if not base64_str:
-                    return url
-                # 解码参数
-                req_str = base64.b64decode(base64_str.encode('utf-8')).decode('utf-8')
-                req_params: Dict[str, dict] = json.loads(req_str)
-                # 是否使用cookie
-                if not req_params.get('cookie'):
-                    cookie = None
-                # 代理
-                proxy = req_params.get('proxy')
-                # 请求头
-                if req_params.get('header'):
-                    headers = req_params.get('header')
-                else:
-                    headers = None
-                if req_params.get('method') == 'get':
-                    # GET请求
-                    res = RequestUtils(
-                        cookies=cookie,
-                        headers=headers,
-                        proxies=Config().get_proxies() if proxy else None
-                    ).get_res(url, params=req_params.get('params'))
-                else:
-                    # POST请求
-                    res = RequestUtils(
-                        cookies=cookie,
-                        headers=headers,
-                        proxies=Config().get_proxies() if proxy else None
-                    ).post_res(url, params=req_params.get('params'))
-                if not res:
-                    return None
-                if not req_params.get('result'):
-                    return res.text
-                else:
-                    data = res.json()
-                    for key in str(req_params.get('result')).split("."):
-                        data = data.get(key)
-                        if not data:
-                            return None
-                    log.info(f"获取到下载地址：{data}")
-                    return data
-            return None
         # 标题
         title = media_info.org_string
         # 详情页面
@@ -206,10 +206,6 @@ class Downloader:
         # 没有种子文件解析链接
         else:
             url = media_info.enclosure
-            if url == "m-team":
-                base_url = StringUtils.get_base_url(page_url)
-                site_info = self.sites.get_sites_by_url_domain(base_url)
-                url = MTeamApi.get_torrent_url_by_detail_url(base_url, page_url, site_info)
             if not url:
                 return None, "下载链接为空"
             # 获取种子内容，磁力链不解析
@@ -219,7 +215,7 @@ class Downloader:
                 # [XPATH]为需从详情页面解析磁力链
                 if url.startswith("["):
                     # 若能解码获取下载地址则不需在详情页解析下载链接
-                    res_redict_url = __get_redict_url(url=url)
+                    res_redict_url = self.__get_redict_url(url=url)
                     _xpath = None if res_redict_url else url[1:-1]
                     url = res_redict_url or page_url
                 # #XPATH#为需从详情页面解析磁力Hash
@@ -244,7 +240,7 @@ class Downloader:
                 # 从HTTP链接下载种子
                 else:
                     # 获取Cookie和ua等
-                    site_info = self.sites.get_site_attr(page_url if "m-team" in url else url)
+                    site_info = self.sites.get_site_attr(page_url if page_url else url)
                     # 下载种子文件，并读取信息
                     _, content, dl_files_folder, dl_files, retmsg = Torrent().get_torrent_info(
                         url=url,
@@ -376,7 +372,7 @@ class Downloader:
                             subtitle_dir = visit_dir
                         ThreadHelper().start_thread(
                             Subtitle().download_subtitle_from_site,
-                            (media_info, site_info.get("id"), site_info.get("cookie"), site_info.get("ua"), site_info.get("apikey"), subtitle_dir, site_info.get("proxy"))
+                            (media_info, site_info, subtitle_dir)
                         )
                 return ret, ""
             else:
@@ -1098,20 +1094,17 @@ class Downloader:
             if dict_type.name == type_name or dict_type.value == type_name:
                 return dict_type
 
-    def get_torrent_episodes(self, url, page_url=None):
+    def get_torrent_episodes(self, url, page_url):
         """
         解析种子文件，获取集数
         :return: 集数列表、种子路径
         """
-        site_info = None
-        if url == "m-team":
-            base_url = StringUtils.get_base_url(page_url)
-            site_info = self.sites.get_sites_by_url_domain(base_url)
-            url = MTeamApi.get_torrent_url_by_detail_url(base_url, page_url, site_info)
-        else:
-            site_info = self.sites.get_site_attr(url)
-        if not site_info.get("cookie") and not site_info.get("apikey"):
+        site_info = self.sites.get_site_attr(page_url)
+        if not site_info:
             return [], None
+        # TODO :特殊站点需先解析出下载链接
+        if site_info.get("parser") in ["MTSpider", "RousiPro"]:
+            url = self.__get_redict_url(url) or url
         # 保存种子文件
         file_path, _, _, files, retmsg = Torrent().get_torrent_info(
             url=url,

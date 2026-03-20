@@ -3,13 +3,15 @@ import json
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
-from app.log import logger
-from app.modules.indexer.parser import SiteParserBase, SiteSchema
-from app.utils.string import StringUtils
+import log as logger
+from app.sites.siteuserinfo._base import SITE_BASE_ORDER
+from app.sites.siteuserinfo import SiteParserBase, SiteSchema
+from app.utils import StringUtils
 
 
 class MTorrentSiteUserInfo(SiteParserBase):
     schema = SiteSchema.MTorrent
+    order = SITE_BASE_ORDER + 100
     request_mode = "apikey"
 
     # 用户级别字典
@@ -34,12 +36,18 @@ class MTorrentSiteUserInfo(SiteParserBase):
         "18": "Bet memberStaff",
     }
 
+    @classmethod
+    def match(cls, html_text):
+        # 馒头手动绑定
+        return 'M-Team' in html_text
+
     def _parse_site_page(self, html_text: str):
         """
         获取站点页面地址
         """
         # 更换api地址
-        self._base_url = f"https://api.{StringUtils.get_url_domain(self._base_url)}"
+        
+        self._base_url = f'https://api.{".".join(StringUtils.get_url_domain(self._base_url).split(".")[-2:])}'
         self._user_traffic_page = None
         self._user_detail_page = None
         self._user_basic_page = "api/member/profile"
@@ -60,7 +68,8 @@ class MTorrentSiteUserInfo(SiteParserBase):
             "Accept": "application/json, text/plain, */*"
         }
         self._addition_headers = {
-            "x-api-key": self.apikey,
+            "x-api-key": self._apikey,
+            "Accept": "application/json"
         }
 
     def _parse_logged_in(self, html_text):

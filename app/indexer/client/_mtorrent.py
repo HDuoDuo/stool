@@ -1,15 +1,17 @@
 import base64
+import os
+import shutil
+from time import sleep
 import json
 import re
 from typing import Tuple, List, Optional
 from urllib.parse import urlparse
 
-from app.core.config import settings
-from app.db.systemconfig_oper import SystemConfigOper
-from app.log import logger
-from app.schemas import MediaType
-from app.utils.http import RequestUtils, AsyncRequestUtils
-from app.utils.string import StringUtils
+from config import Config, RMT_SUBEXT
+import log as logger
+from app.utils.types import MediaType
+from app.helper import SiteHelper
+from app.utils import RequestUtils, StringUtils, PathUtils, ExceptionUtils
 
 
 class MTorrentSpider:
@@ -54,20 +56,17 @@ class MTorrentSpider:
     }
 
     def __init__(self, indexer: dict):
-        self.systemconfig = SystemConfigOper()
         if indexer:
-            self._indexerid = indexer.get('id')
-            self._url = indexer.get('domain')
-            self._domain = StringUtils.get_url_domain(self._url)
+            self._indexerid = indexer.id
+            self._url = indexer.domain
+            self._domain = ".".join(StringUtils.get_url_domain(self._url).split(".")[-2:])
             self._searchurl = self._searchurl % self._domain
-            self._name = indexer.get('name')
-            if indexer.get('proxy'):
-                self._proxy = settings.PROXY
-            self._cookie = indexer.get('cookie')
-            self._ua = indexer.get('ua')
-            self._apikey = indexer.get('apikey')
-            self._token = indexer.get('token')
-            self._timeout = indexer.get('timeout') or 15
+            self._name = indexer.name
+            if indexer.proxy:
+                self._proxy = Config().get_proxies()
+            self._cookie = indexer.cookie
+            self._ua = indexer.ua
+            self._apikey = indexer.apikey
 
     def __get_params(self, keyword: str, mtype: MediaType = None, page: Optional[int] = 0) -> dict:
         """
@@ -81,7 +80,7 @@ class MTorrentSpider:
             categories = self._movie_category
         # mtorrent搜索imdb需要输入完整imdb链接，参见 https://wiki.m-team.cc/zh-tw/imdbtosearch
         if keyword and keyword.startswith("tt"):
-            keyword = f"https://www.imdb.com/title/{keyword}"
+            keyword = f'https://www.imdb.com/title/{keyword}'
         return {
             "keyword": keyword,
             "categories": categories,
@@ -123,7 +122,7 @@ class MTorrentSpider:
                 'title': result.get('name'),
                 'description': result.get('smallDescr'),
                 'enclosure': self.__get_download_url(result.get('id')),
-                'pubdate': StringUtils.format_timestamp(result.get('createdDate')),
+                'pubdate': StringUtils.timestamp_to_date(result.get('createdDate')),
                 'size': int(result.get('size') or '0'),
                 'seeders': int(status.get("seeders") or '0'),
                 'peers': int(status.get("leechers") or '0'),
@@ -136,18 +135,18 @@ class MTorrentSpider:
                 'category': category
             }
             if discount_end_time := status.get('discountEndTime'):
-                torrent['freedate'] = StringUtils.format_timestamp(discount_end_time)
+                torrent['freedate'] = StringUtils.timestamp_to_date(discount_end_time)
             # 解析全站促销时的规则(当前馒头只有下载促销)
             if promotion_rule := status.get("promotionRule"):
                 discount = promotion_rule.get("discount", "NORMAL")
                 torrent["downloadvolumefactor"] = self.__get_downloadvolumefactor(discount)
                 if end_time := promotion_rule.get("endTime"):
-                    torrent["freedate"] = StringUtils.format_timestamp(end_time)
+                    torrent["freedate"] = StringUtils.timestamp_to_date(end_time)
             if mall_single_free := status.get("mallSingleFree"):
                 if mall_single_free.get("status") == "ONGOING":
                     torrent["downloadvolumefactor"] = self.__get_downloadvolumefactor("FREE")
                     if end_date := mall_single_free.get("endDate"):
-                        torrent["freedate"] = StringUtils.format_timestamp(end_date)
+                        torrent["freedate"] = StringUtils.timestamp_to_date(end_date)
             torrents.append(torrent)
         return torrents
 
@@ -157,7 +156,7 @@ class MTorrentSpider:
         """
         # 检查ApiKey
         if not self._apikey:
-            return True, []
+            return []
 
         # 获取请求参数
         params = self.__get_params(keyword, mtype, page)
@@ -166,54 +165,22 @@ class MTorrentSpider:
         res = RequestUtils(
             headers={
                 "Content-Type": "application/json",
-                "User-Agent": f"{self._ua}",
+                "User-Agent": f'{self._ua}',
                 "x-api-key": self._apikey
             },
             proxies=self._proxy,
-            referer=f"{self._domain}browse",
+            referer=f'{self._domain}browse',
             timeout=self._timeout
         ).post_res(url=self._searchurl, json=params)
         if res and res.status_code == 200:
             results = res.json().get('data', {}).get("data") or []
-            return False, self.__parse_result(results)
+            return self.__parse_result(results)
         elif res is not None:
-            logger.warn(f"{self._name} 搜索失败，错误码：{res.status_code}")
-            return True, []
+            logger.warn(f'{self._name} 搜索失败，错误码：{res.status_code}')
+            return []
         else:
-            logger.warn(f"{self._name} 搜索失败，无法连接 {self._domain}")
-            return True, []
-
-    async def async_search(self, keyword: str, mtype: MediaType = None, page: Optional[int] = 0) -> Tuple[bool, List[dict]]:
-        """
-        搜索
-        """
-        # 检查ApiKey
-        if not self._apikey:
-            return True, []
-
-        # 获取请求参数
-        params = self.__get_params(keyword, mtype, page)
-
-        # 发送请求
-        res = await AsyncRequestUtils(
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": f"{self._ua}",
-                "x-api-key": self._apikey
-            },
-            proxies=self._proxy,
-            referer=f"{self._domain}browse",
-            timeout=self._timeout
-        ).post_res(url=self._searchurl, json=params)
-        if res and res.status_code == 200:
-            results = res.json().get('data', {}).get("data") or []
-            return False, self.__parse_result(results)
-        elif res is not None:
-            logger.warn(f"{self._name} 搜索失败，错误码：{res.status_code}")
-            return True, []
-        else:
-            logger.warn(f"{self._name} 搜索失败，无法连接 {self._domain}")
-            return True, []
+            logger.warn(f'{self._name} 搜索失败，无法连接 {self._domain}')
+            return []
 
     @staticmethod
     def __find_imdbid(imdb: str) -> str:
@@ -277,111 +244,217 @@ class MTorrentSpider:
         }
         # base64编码
         base64_str = base64.b64encode(json.dumps(params).encode('utf-8')).decode('utf-8')
-        return f"[{base64_str}]{url}"
+        return f'[{base64_str}]{url}'
+    
+    def download_subtitles_by_pageurl(self, page_url: str, meta_name: str, download_dir: str):
+        addr = urlparse(page_url)
+        logger.info(f"【MTorrentSpider】下载馒头字幕 {page_url}")
+        if not self._apikey:
+            logger.warn(f"【MTorrentSpider】 获取馒头字幕失败, 未设置站点Api-Key")
+            return
+        # 从馒头的详情页网址中提取种子id
+        torrent_id = urlparse(page_url).path.rsplit("/", 1)[-1].strip()
+        try:
+            subtitle_info_list = self.__get_subtitles_info_by_id(torrent_id, meta_name)
+            sleep(10)
+            for subtitle_info in subtitle_info_list:
+                self.download_subtitle_by_url(torrent_id, subtitle_info, meta_name, download_dir)
+                # 等待10s,避免请求失败
+                sleep(10)
+        except Exception as e:
+            logger.error(f'{self._name} 获取字幕失败：{e}')
 
-    def get_subtitle_links(self, page_url: str) -> List[str]:
+    def download_subtitle_by_url(self, torrentid, subtitle_info: dict, meta_name: str, download_dir: str) -> List[str]:
         """
-        获取指定页面的字幕下载链接
+        从下载链接下载字幕
 
         :param page_url: 种子详情页网址
         :type page_url: str
         :return: 字幕下载链接
         :rtype: List[str]
         """
-        if not page_url:
-            return []
-        # 从馒头的详情页网址中提取种子id
-        torrent_id = urlparse(page_url).path.rsplit("/", 1)[-1].strip()
-        if not torrent_id:
-            return []
-        return self.get_subtitle_links_by_id(torrent_id)
+        subtitle_id = subtitle_info.get("id")
+        download_url = self.__subtitle_genlink(subtitle_id)
+        filename = subtitle_info.get("filename")
+        lang = subtitle_info.get("lang")
+        meta_name = subtitle_info.get("metaname")
+        res = RequestUtils(
+            headers={
+                'x-api-key': self._apikey,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": self._ua,
+                "Accept": "*/*"
+            },
+            proxies=self._proxy,
+            timeout=30
+        ).get_res(download_url)
+        if res and res.status_code == 200:
+            # 创建目录
+            if not os.path.exists(download_dir):
+                os.makedirs(download_dir, exist_ok=True)
+            # 保存ZIP
+            spli_filename = os.path.splitext(filename)
+            if meta_name:
+                file_name = (meta_name+'.'+subtitle_id+'.chi'+spli_filename[-1]) if lang == "25" else (meta_name+'.'+subtitle_id+spli_filename[-1])
+            else:
+                file_name = (spli_filename[0]+'.chi'+spli_filename[-1]) if lang == "25" and ".chi." not in filename else filename
+            if not file_name:
+                logger.warn(f"【MTorrentSpider】 馒头{torrentid} 字幕文件非法：{subtitle_id}")
+                return
+            save_tmp_path = Config().get_temp_path()
+            if file_name.lower().endswith((".zip", ".tar")):
+                # ZIP包
+                zip_file = os.path.join(save_tmp_path, file_name)
+                # 解压路径
+                zip_path = os.path.splitext(zip_file)[0]
+                with open(zip_file, 'wb') as f:
+                    f.write(res.content)
+                # 解压文件
+                shutil.unpack_archive(zip_file, zip_path)
+                # 遍历转移文件
+                for sub_file in PathUtils.get_dir_files(in_path=zip_path, exts=RMT_SUBEXT):
+                    target_sub_file = os.path.join(download_dir,os.path.basename(sub_file))
+                    logger.info(f"【MTorrentSpider】 馒头{torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
+                    SiteHelper.transfer_subtitle(sub_file, target_sub_file)
+                # 删除临时文件
+                try:
+                    shutil.rmtree(zip_path)
+                    os.remove(zip_file)
+                except Exception as err:
+                    ExceptionUtils.exception_traceback(err)
+            else:
+                sub_file = os.path.join(save_tmp_path, file_name)
+                # 保存
+                with open(sub_file, 'wb') as f:
+                    f.write(res.content)
+                target_sub_file = os.path.join(download_dir,os.path.basename(sub_file))
+                logger.info(f"【MTorrentSpider】 馒头{torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
+                SiteHelper.transfer_subtitle(sub_file, target_sub_file)
+        elif res is not None:
+            logger.warn(f"【MTorrentSpider】 下载馒头{torrentid}字幕 {filename} 失败，错误码：{res.status_code}")
+        else:
+            logger.warn(f"【MTorrentSpider】 下载馒头{torrentid}字幕 {filename} 失败，无法连接 {download_url}")   
 
-    def get_subtitle_links_by_id(self, torrent_id: str) -> List[str]:
-        """
-        获取指定种子的字幕下载链接
-
-        :param torrent_id: 种子ID
-        :type torrent_id: str
-        :return: 字幕下载链接
-        :rtype: List[str]
-        """
-        results = []
-        try:
-            for subtitle_id in self.__subtitle_ids(torrent_id) or []:
-                if link := self.__subtitle_genlink(subtitle_id):
-                    results.append(link)
-        except Exception as e:
-            logger.error(f"{self._name} 获取字幕失败：{e}")
-        return results
-
-    def __subtitle_ids(self, torrent_id: str) -> Optional[List[str]]:
+    def __get_subtitles_info_by_id(self, torrent_id: str, meta_name: str) -> Optional[List[str]]:
         """
         获取指定种子的字幕列表
-
-        :param torrent_id: 种子ID
-        :type torrent_id: str
-        :return: 字幕ID
-        :rtype: List[str] | None
         """
         url = self._subtitle_list_url % self._domain
         # 发送请求
         res = RequestUtils(
             headers={
                 "Accept": "application/json, text/plain, */*",
-                "User-Agent": f"{self._ua}",
+                "User-Agent": f'{self._ua}',
                 "x-api-key": self._apikey,
             },
             proxies=self._proxy,
             timeout=self._timeout,
-        ).post_res(url, data={"id": torrent_id})
+        ).post_res(url, params={"id": torrent_id})
         if res and res.status_code == 200:
-            result = res.json()
-            if int(result.get("code", -1)) == 0:
-                return [item["id"] for item in result.get("data", []) if "id" in item]
+            results = res.json()
+            if int(results.get("code", -1)) == 0:
+                subtitle_list = []
+                for result in results.get("data", []):
+                    subtitle = {
+                        "id": result.get("id"),
+                        "filename": result.get("filename"),
+                        "lang": result.get("lang"),
+                        "metaname": meta_name
+                    }
+                    subtitle_list.append(subtitle)
+                return subtitle_list
             else:
-                logger.warn(
-                    f"{self._name} 获取字幕列表失败，返回：{result.get("message", "未知")}"
-                )
+                logger.warn(f'{self._name} 获取字幕列表失败，返回：{results.get("message", "未知")}')
                 return None
         elif res is not None:
-            logger.warn(f"{self._name} 获取字幕列表失败，错误码：{res.status_code}")
+            logger.warn(f'{self._name} 获取字幕列表失败，错误码：{res.status_code}')
             return None
         else:
-            logger.warn(f"{self._name} 获取字幕列表失败，无法连接 {self._domain}")
+            logger.warn(f'{self._name} 获取字幕列表失败，无法连接 {self._domain}')
             return None
 
     def __subtitle_genlink(self, subtitle_id: str) -> Optional[str]:
         """
-        获取字幕下载链接
-
-        :param subtitle_id: 字幕ID
-        :type subtitle_id: str
-        :return: 下载链接
-        :rtype: str | None
+        获取字幕的下载链接
         """
         url = self._subtitle_genlink_url % self._domain
         # 发送请求
         res = RequestUtils(
             headers={
                 "Accept": "application/json, text/plain, */*",
-                "User-Agent": f"{self._ua}",
+                "User-Agent": f'{self._ua}',
                 "x-api-key": self._apikey,
             },
             proxies=self._proxy,
             timeout=self._timeout,
-        ).post_res(url, data={"id": subtitle_id})
+        ).post_res(url, params={"id": subtitle_id})
         if res and res.status_code == 200:
             result = res.json()
             if int(result.get("code", -1)) == 0 and isinstance(result.get("data"), str):
                 return self._subtitle_download_url % (self._domain, result["data"])
             else:
-                logger.warn(
-                    f"{self._name} 获取字幕下载链接失败，返回：{result.get("message", "未知")}"
-                )
+                logger.warn(f'{self._name} 获取字幕下载链接失败，返回：{result.get("message", "未知")}')
                 return None
         elif res is not None:
-            logger.warn(f"{self._name} 获取字幕下载链接失败，错误码：{res.status_code}")
+            logger.warn(f'{self._name} 获取字幕下载链接失败，错误码：{res.status_code}')
             return None
         else:
-            logger.warn(f"{self._name} 获取字幕下载链接失败，无法连接 {self._domain}")
+            logger.warn(f'{self._name} 获取字幕下载链接失败，无法连接 {self._domain}')
             return None
+
+    # 获取种子的促销详情
+    def check_torrent_attr(self, torrent_url):
+        ret_attr = {
+            "free": False,
+            "2xfree": False,
+            "hr": False,
+            "peer_count": 0
+        }
+        addr = urlparse(torrent_url)
+        # /detail/770**
+        m = re.match("/detail/([0-9]+)", addr.path)
+        if not m:
+            logger.warn(f"【MTorrentSpider】 获取馒头种子属性失败 path：{addr.path}")
+            return ret_attr
+        torrentid = int(m.group(1))
+        if not self._apikey:
+            logger.warn("【MTorrentSpider】 获取馒头种子属性失败, 未设置站点Api-Key")
+            return ret_attr
+        site_url = "%s/api/torrent/detail" % StringUtils.get_base_url(torrent_url).replace("kp", "api")
+        res = RequestUtils(
+            headers={
+                'x-api-key': self._apikey,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": self._ua,
+                "Accept": "application/json"
+            },
+            proxies=Config().get_proxies() if self._proxy else None,
+            timeout=30
+        ).post_res(url=site_url, params=("id=%d" % torrentid))
+        if res and res.status_code == 200:
+            msg = res.json().get('message')
+            if msg != "SUCCESS":
+                logger.warn(f"【MTorrentSpider】 获取馒头种子{torrentid}属性失败：{msg}")
+                return ret_attr
+            result = res.json().get('data', {})
+            status = result.get('status')
+            ret_attr["peer_count"] = int(status.get('seeders'))
+            """
+            NORMAL:上传下载都1倍
+            _2X_FREE:上傳乘以二倍，下載不計算流量。
+            _2X_PERCENT_50:上傳乘以二倍，下載計算一半流量。
+            _2X:上傳乘以二倍，下載計算正常流量。
+            PERCENT_50:上傳計算正常流量，下載計算一半流量。
+            PERCENT_30:上傳計算正常流量，下載計算該種子流量的30%。
+            FREE:上傳計算正常流量，下載不計算流量。
+            """
+            discount = status.get('discount')
+            if discount == "_2X_FREE":
+                ret_attr["2xfree"] = True
+            elif discount == "FREE":
+                ret_attr["free"] = True
+        elif res is not None:
+            logger.warn(f"【MTorrentSpider】 获取馒头种子{torrentid}属性失败，错误码：{res.status_code}")
+        else:
+            logger.warn(f"【MTorrentSpider】 获取馒头种子{torrentid}属性失败，无法连接 {site_url}")
+        return ret_attr

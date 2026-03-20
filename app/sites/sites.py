@@ -21,7 +21,6 @@ from app.conf import SiteConf
 from app.utils import RequestUtils, StringUtils, ExceptionUtils
 from app.utils.commons import singleton
 from config import Config
-from app.apis import MTeamApi
 from app.sites.site_limiter import SiteRateLimiter
 
 lock = Lock()
@@ -115,6 +114,7 @@ class Sites:
                 "statistic_enable": statistic_enable,
                 "uses": uses,
                 "ua": site_note.get("ua"),
+                "parser": site_note.get("parser"),
                 "apikey": site_note.get("apikey"),
                 "parse": True if site_note.get("parse") == "Y" else False,
                 "unread_msg_notify": True if site_note.get("message") == "Y" else False,
@@ -178,12 +178,6 @@ class Sites:
         if siteid or siteurl:
             return {}
         return ret_sites
-    
-    def get_sites_by_url_domain(self, url):
-        """
-        根据传入的url获取站点配置
-        """
-        return self._siteByUrls.get(StringUtils.get_url_domain(url))
 
     def ratio_beyong(self, site_name):
         """
@@ -388,6 +382,58 @@ class Sites:
         else:
             self.message.send_site_message(
                 title=f"站点 {site_user_info.site_name} 收到 {site_user_info.message_unread} 条新消息，请登陆查看")
+        
+    def __rousi_test(self, url, apikey, proxy):
+        """
+        判断站点是否已经登陆：rousi
+        """
+        url = f"{url}/api/v1/profile"
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {apikey}",
+        }
+        # 计时
+        start_time = datetime.now()
+        res = RequestUtils(
+            headers=headers,
+            proxies=Config().get_proxies() if proxy else None
+        ).get_res(url=url)
+        seconds = int((datetime.now() - start_time).microseconds / 1000)
+        if res is None:
+            return False, "无法打开网站！", seconds
+        if res.status_code == 200:
+            user_info = res.json()
+            if user_info and user_info.get("code") == 0:
+                return True, "连接成功", seconds
+            return False, "APIKEY已过期", seconds
+        else:
+            return False, f"错误：{res.status_code} {res.reason}", seconds
+        
+    def __mteam_test(self, url, ua, apikey, proxy):
+        site_url = url.replace("kp", "api") + "/api/system/hello"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": ua,
+            "x-api-key": apikey,
+            "Accept": "application/json"
+        }
+        # 计时
+        start_time = datetime.now()
+        res = RequestUtils(headers=headers,
+                           proxies=Config().get_proxies() if proxy else None
+                           ).post_res(url=site_url)
+        seconds = int((datetime.now() - start_time).microseconds / 1000)
+        if res and res.status_code == 200:
+            msg = res.json().get("message") or "null"
+            if msg == "SUCCESS":
+                return True, "连接成功", seconds
+            else:
+                return False, msg, seconds
+        elif res is not None:
+            return False, f"连接失败，状态码：{res.status_code}", seconds
+        else:
+            return False, "无法打开网站", seconds
 
     def test_connection(self, site_id):
         """
@@ -403,48 +449,53 @@ class Sites:
         if not site_apikey and not site_cookie:
             return False, "未配置站点Cookie或ApiKey", 0
         ua = site_info.get("ua")
+        proxy = site_info.get("proxy")
         site_url = StringUtils.get_base_url(site_info.get("signurl") or site_info.get("rssurl"))
         if not site_url:
             return False, "未配置站点地址", 0
-        # 站点特殊处理...
-        if 'm-team' in site_url:
-            return MTeamApi.test_mt_connection(site_info)
-        chrome = ChromeHelper()
-        if site_info.get("chrome") and chrome.get_status():
-            # 计时
-            start_time = datetime.now()
-            if not chrome.visit(url=site_url, ua=ua, apikey=site_apikey, cookie=site_cookie):
-                return False, "Chrome模拟访问失败", 0
-            # 循环检测是否过cf
-            cloudflare = chrome.pass_cloudflare()
-            seconds = int((datetime.now() - start_time).microseconds / 1000)
-            if not cloudflare:
-                return False, "跳转站点失败", seconds
-            # 判断是否已签到
-            html_text = chrome.get_html()
-            if not html_text:
-                return False, "获取站点源码失败", 0
-            if SiteHelper.is_logged_in(html_text):
-                return True, "连接成功", seconds
-            else:
-                return False, "Cookie失效", seconds
+        # TODO :特殊站点处理
+        parser = site_info.get("parser")
+        if parser == "RousiPro":
+            return self.__rousi_test(site_url, site_apikey, proxy)
+        elif parser == "MTSpider":
+            return self.__mteam_test(site_url, ua, site_apikey, proxy)
         else:
-            # 计时
-            start_time = datetime.now()
-            res = RequestUtils(cookies=site_cookie,
-                               headers=ua,
-                               proxies=Config().get_proxies() if site_info.get("proxy") else None
-                               ).get_res(url=site_url)
-            seconds = int((datetime.now() - start_time).microseconds / 1000)
-            if res and res.status_code == 200:
-                if not SiteHelper.is_logged_in(res.text):
-                    return False, "Cookie失效", seconds
-                else:
+            chrome = ChromeHelper()
+            if site_info.get("chrome") and chrome.get_status():
+                # 计时
+                start_time = datetime.now()
+                if not chrome.visit(url=site_url, ua=ua, apikey=site_apikey, cookie=site_cookie):
+                    return False, "Chrome模拟访问失败", 0
+                # 循环检测是否过cf
+                cloudflare = chrome.pass_cloudflare()
+                seconds = int((datetime.now() - start_time).microseconds / 1000)
+                if not cloudflare:
+                    return False, "跳转站点失败", seconds
+                # 判断是否已签到
+                html_text = chrome.get_html()
+                if not html_text:
+                    return False, "获取站点源码失败", 0
+                if SiteHelper.is_logged_in(html_text):
                     return True, "连接成功", seconds
-            elif res is not None:
-                return False, f"连接失败，状态码：{res.status_code}", seconds
+                else:
+                    return False, "Cookie失效", seconds
             else:
-                return False, "无法打开网站", seconds
+                # 计时
+                start_time = datetime.now()
+                res = RequestUtils(cookies=site_cookie,
+                                   headers=ua,
+                                   proxies=Config().get_proxies() if site_info.get("proxy") else None
+                                  ).get_res(url=site_url)
+                seconds = int((datetime.now() - start_time).microseconds / 1000)
+                if res and res.status_code == 200:
+                    if not SiteHelper.is_logged_in(res.text):
+                        return False, "Cookie失效", seconds
+                    else:
+                        return True, "连接成功", seconds
+                elif res is not None:
+                    return False, f"连接失败，状态码：{res.status_code}", seconds
+                else:
+                    return False, "无法打开网站", seconds
 
     def signin(self):
         """
@@ -758,9 +809,6 @@ class Sites:
         }
         if not torrent_url:
             return ret_attr
-        domain = StringUtils.get_url_domain(torrent_url)
-        if 'm-team' in domain:
-            return MTeamApi.check_torrent_attr(torrent_url, ua, apikey, proxy)
         xpath_strs = self.get_grapsite_conf(torrent_url)
         if not xpath_strs:
             return ret_attr

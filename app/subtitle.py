@@ -7,11 +7,12 @@ from lxml import etree
 
 import log
 from app.conf import SiteConf
-from app.helper import OpenSubtitles, SiteHelper
-from app.utils import RequestUtils, PathUtils, SystemUtils, StringUtils, ExceptionUtils
+from app.helper import OpenSubtitles, SiteHelper, IndexerHelper
+from app.utils import RequestUtils, PathUtils, StringUtils, ExceptionUtils
 from app.utils.commons import singleton
 from app.utils.types import MediaType
 from app.sites import Sites
+from app.indexer.client._mtorrent import MTorrentSpider
 from config import Config, RMT_SUBEXT
 
 
@@ -250,32 +251,42 @@ class Subtitle:
             return False, ret_msg
 
 
-    def download_subtitle_from_site(self, media_info, site_id, cookie, ua, apikey, download_dir, proxy=False):
+    def download_subtitle_from_site(self, media_info, site_info, download_dir):
         """
         从站点下载字幕文件，并保存到本地
         """
-        if not media_info.page_url:
+        page_url = media_info.page_url
+        if not page_url:
             return
         # 字幕下载目录
-        log.info("【Subtitle】开始从站点下载字幕：%s" % media_info.page_url)
+        log.info("【Subtitle】开始从站点下载字幕：%s" % page_url)
         if not download_dir:
             log.warn("【Subtitle】未找到字幕下载目录")
             return
+        site_id = site_info.get("id")
         # 站点流控
         if Sites().check_ratelimit(site_id):
             log.warn(f"【Sites】{site_id}触发了站点流控，停止下载字幕")
             return
-        # 馒头特殊处理
-        domain = StringUtils.get_url_domain(media_info.page_url)
-        if 'm-team' in domain:
-            from app.apis import MTeamApi
-            return MTeamApi.download_subtitle(media_info, site_id, cookie, ua, apikey, download_dir, proxy)
+        cookie = site_info.get("cookie")
+        ua = site_info.get("ua")
+        apikey =  site_info.get("apikey")
+        proxy = site_info.get("proxy")
+        parser = site_info.get("parser")
+        # TODO :特殊站点用不同方式下载字幕
+        if parser == "MTSpider":
+            indexer = IndexerHelper().get_indexer(StringUtils.get_url_domain(page_url),
+                                                  cookie=cookie,
+                                                  ua=ua,
+                                                  apikey=apikey,
+                                                  proxy=proxy)
+            return MTorrentSpider(indexer).download_subtitles_by_pageurl(page_url, media_info.get_name(), download_dir)
         # 读取网站代码
         request = RequestUtils(cookies=cookie, headers=ua)
-        res = request.get_res(media_info.page_url)
+        res = request.get_res(page_url)
         if res and res.status_code == 200:
             if not res.text:
-                log.warn(f"【Subtitle】读取页面代码失败：{media_info.page_url}")
+                log.warn(f"【Subtitle】读取页面代码失败：{page_url}")
                 return
             html = etree.HTML(res.text)
             sublink_list = []
@@ -286,7 +297,7 @@ class Subtitle:
                         if not sublink:
                             continue
                         if not sublink.startswith("http"):
-                            base_url = StringUtils.get_base_url(media_info.page_url)
+                            base_url = StringUtils.get_base_url(page_url)
                             if sublink.startswith("/"):
                                 sublink = "%s%s" % (base_url, sublink)
                             else:
@@ -338,11 +349,11 @@ class Subtitle:
                     log.error(f"【Subtitle】下载字幕文件失败：{sublink}")
                     continue
             if sublink_list:
-                log.info(f"【Subtitle】{media_info.page_url} 页面字幕下载完成")
+                log.info(f"【Subtitle】{page_url} 页面字幕下载完成")
         elif res is not None:
-            log.warn(f"【Subtitle】连接 {media_info.page_url} 失败，状态码：{res.status_code}")
+            log.warn(f"【Subtitle】连接 {page_url} 失败，状态码：{res.status_code}")
         else:
-            log.warn(f"【Subtitle】无法打开链接：{media_info.page_url}")
+            log.warn(f"【Subtitle】无法打开链接：{page_url}")
 
     @staticmethod
     def __get_url_subtitle_name(disposition, url):

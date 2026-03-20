@@ -13,6 +13,9 @@ from app.subscribe import Subscribe
 from app.utils import DomUtils, RequestUtils, StringUtils, ExceptionUtils, RssTitleUtils, Torrent
 from app.utils.types import MediaType, SearchType
 from config import Config
+from app.helper import IndexerHelper
+from app.indexer.client._mtorrent import MTorrentSpider
+from app.indexer.client._rousi import RousiSpider
 
 lock = Lock()
 
@@ -110,6 +113,7 @@ class Rss:
                     continue
                 site_cookie = site_info.get("cookie")
                 site_ua = site_info.get("ua")
+                site_parser = site_info.get("parser")
                 site_apikey = site_info.get("apikey")
                 # 是否解析种子详情
                 site_parse = site_info.get("parse")
@@ -179,6 +183,7 @@ class Rss:
                             site_cookie=site_cookie,
                             site_parse=site_parse,
                             site_ua=site_ua,
+                            site_parser=site_parser,
                             site_apikey=site_apikey,
                             site_proxy=site_proxy)
                         for msg in match_msg:
@@ -388,6 +393,7 @@ class Rss:
                           site_cookie,
                           site_parse,
                           site_ua,
+                          site_parser,
                           site_apikey,
                           site_proxy):
         """
@@ -505,11 +511,29 @@ class Rss:
             # 解析种子详情
             if site_parse:
                 # 检测Free
-                torrent_attr = self.sites.check_torrent_attr(torrent_url=media_info.page_url,
-                                                             cookie=site_cookie,
-                                                             ua=site_ua,
-                                                             apikey=site_apikey,
-                                                             proxy=site_proxy)
+                # TODO :特殊站点特殊处理
+                torrent_attr = None
+                page_url = media_info.page_url
+                if site_parser == "MTSpider":
+                    indexer = IndexerHelper().get_indexer(StringUtils.get_url_domain(page_url),
+                                                          cookie=site_cookie,
+                                                          ua=site_ua,
+                                                          apikey=site_apikey,
+                                                          proxy=site_proxy)
+                    torrent_attr = MTorrentSpider(indexer).check_torrent_attr(page_url)
+                elif site_parser == "RousiPro":
+                    indexer = IndexerHelper().get_indexer(StringUtils.get_url_domain(page_url),
+                                                          cookie=site_cookie,
+                                                          ua=site_ua,
+                                                          apikey=site_apikey,
+                                                          proxy=site_proxy)
+                    torrent_attr = RousiSpider(indexer).check_torrent_attr(page_url)
+                else:
+                    torrent_attr = self.sites.check_torrent_attr(page_url,
+                                                                site_cookie,
+                                                                ua=site_ua,
+                                                                apikey=site_apikey,
+                                                                proxy=site_proxy)
                 if torrent_attr.get('2xfree'):
                     download_volume_factor = 0.0
                     upload_volume_factor = 2.0

@@ -58,7 +58,7 @@ class SiteConf:
 
     # 检测种子促销的站点XPATH，不在此清单的无法开启仅RSS免费种子功能
     RSS_SITE_GRAP_CONF = {
-        'rousi.zip': {
+        'rousi.pro': {
             "FREE":["//h1[@id='top']/b/font[@class='free']"],
             "2XFREE":["//h1[@id='top']/b/font[@class='twoupfree']"],
             "HR":[],

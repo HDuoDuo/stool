@@ -21,6 +21,8 @@ class _ISiteUserInfo(metaclass=ABCMeta):
     schema = SiteSchema.NexusPhp
     # 站点解析时判断顺序，值越小越先解析
     order = SITE_BASE_ORDER
+    # 请求模式 cookie/apikey
+    request_mode = "cookie"
 
     def __init__(self, site_name, url, site_cookie, index_html, session=None, ua=None, apikey=None, emulate=False, proxy=None):
         super().__init__()

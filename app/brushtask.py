@@ -17,7 +17,9 @@ from app.utils import StringUtils, Torrent, ExceptionUtils
 from app.utils.commons import singleton
 from app.utils.types import BrushDeleteType
 from config import BRUSH_REMOVE_TORRENTS_INTERVAL, Config
-
+from app.helper import IndexerHelper
+from app.indexer.client._mtorrent import MTorrentSpider
+from app.indexer.client._rousi import RousiSpider
 
 @singleton
 class BrushTask(object):
@@ -232,6 +234,7 @@ class BrushTask(object):
                                              cookie=cookie,
                                              siteid=site_id,
                                              ua=ua,
+                                             parser=site_info.get("parser"),
                                              apikey=apikey,
                                              proxy=site_proxy):
                     continue
@@ -706,6 +709,7 @@ class BrushTask(object):
                          siteid,
                          cookie,
                          ua,
+                         parser,
                          apikey,
                          proxy):
         """
@@ -754,12 +758,29 @@ class BrushTask(object):
             if rss_rule.get("exclude"):
                 if re.search(r"%s" % rss_rule.get("exclude"), title):
                     return False
-
-            torrent_attr = self.sites.check_torrent_attr(torrent_url=torrent_url,
-                                                         cookie=cookie,
-                                                         ua=ua,
-                                                         apikey=apikey,
-                                                         proxy=proxy)
+            
+            # TODO :特殊站点特殊处理
+            torrent_attr = None
+            if parser == "MTSpider":
+                indexer = IndexerHelper().get_indexer(StringUtils.get_url_domain(torrent_url),
+                                                  cookie=cookie,
+                                                  ua=ua,
+                                                  apikey=apikey,
+                                                  proxy=proxy)
+                torrent_attr = MTorrentSpider(indexer).check_torrent_attr(torrent_url)
+            elif parser == "RousiPro":
+                indexer = IndexerHelper().get_indexer(StringUtils.get_url_domain(torrent_url),
+                                                  cookie=cookie,
+                                                  ua=ua,
+                                                  apikey=apikey,
+                                                  proxy=proxy)
+                torrent_attr = RousiSpider(indexer).check_torrent_attr(torrent_url)
+            else:
+                torrent_attr = self.sites.check_torrent_attr(torrent_url,
+                                                             cookie,
+                                                             ua=ua,
+                                                             apikey=apikey,
+                                                             proxy=proxy)
             torrent_peer_count = int(torrent_attr.get("peer_count"))
             log.debug("【Brush】%s 解析详情, %s" % (title, torrent_attr))
 

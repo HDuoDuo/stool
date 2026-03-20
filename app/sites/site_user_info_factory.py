@@ -2,10 +2,9 @@ import requests
 
 import log
 from app.helper import ChromeHelper, SubmoduleHelper
-from app.utils import RequestUtils, ExceptionUtils,StringUtils
+from app.utils import RequestUtils, ExceptionUtils
 from app.utils.commons import singleton
 from config import Config
-from app.sites.siteuserinfo.mteam_torrent import MTeamTorrentUserInfo
 
 @singleton
 class SiteUserInfoFactory(object):
@@ -32,11 +31,7 @@ class SiteUserInfoFactory(object):
         log.debug(f"【Sites】站点 {site_name} url={url} site_cookie={site_cookie} ua={ua} apikey={apikey}")
         session = requests.Session()
 
-        # 避免馒头首页返回xml内容修改无法绑定，且效率高
-        site_domain_url = StringUtils.get_base_url(url)
-        if 'm-team' in site_domain_url:
-            return MTeamTorrentUserInfo(site_name, site_domain_url, site_cookie, "", session=session, ua=ua, apikey=apikey, emulate=emulate, proxy=proxy)
-        
+        # 避免馒头首页返回xml内容修改无法绑定，且效率高        
         # 检测环境，有浏览器内核的优先使用仿真签到
         chrome = ChromeHelper()
         if emulate and chrome.get_status():

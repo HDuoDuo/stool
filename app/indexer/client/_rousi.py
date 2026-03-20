@@ -1,6 +1,7 @@
 import base64
 import json
 from typing import List, Optional, Tuple
+from urllib.parse import urlparse
 
 from config import Config
 import log as logger
@@ -285,3 +286,41 @@ class RousiSpider:
         }
         base64_str = base64.b64encode(json.dumps(params).encode('utf-8')).decode('utf-8')
         return f"[{base64_str}]{url}"
+    
+    # 获取种子的促销详情
+    def check_torrent_attr(self, link):
+        ret_attr = {
+            "free": False,
+            "2xfree": False,
+            "hr": False,
+            "peer_count": 0
+        }
+        # 从馒头的详情页网址中提取种子id
+        uuid_str = urlparse(link).path.rsplit("/", 1)[-1].strip()
+        url = self._downloadurl % uuid_str
+        headers = {
+                'Authorization': f'Bearer {self._apikey}',
+                'Accept': 'application/json, text/plain, */*'
+            }
+        # GET请求
+        res = RequestUtils(
+            headers=headers,
+            proxies=self._proxy
+        ).get_res(url)
+        if res and res.status_code == 200:
+            try:
+                data = res.json()
+                if data.get('code') == 0:
+                    ret_attr["peer_count"] = int(data.get('data', {}).get('seeders', 0))
+                    promotion = data.get('data', {}).get('promotion', {})
+                    price = data.get('data', {}).get('price', 0)
+                    if promotion and promotion.get('is_active'):
+                        downloadvolumefactor = int(promotion.get('down_multiplier', 1))
+                        uploadvolumefactor = int(promotion.get('up_multiplier', 1))
+                        if downloadvolumefactor == 0:
+                            ret_attr["free"] = True if uploadvolumefactor == 1 and not price else False
+                            ret_attr["2xfree"] = True if uploadvolumefactor == 2 and not price else False
+            except Exception as e:
+                logger.warn(f"【RousiSpider】{self._name} 解析种子促销详情响应失败：{e}")
+        return ret_attr
+        

@@ -22,7 +22,7 @@ from app.downloader.client import Qbittorrent, Transmission
 from app.filetransfer import FileTransfer
 from app.filter import Filter
 from app.helper import DbHelper, ProgressHelper, ThreadHelper, \
-    MetaHelper, DisplayHelper, WordsHelper, CookieCloudHelper
+    MetaHelper, DisplayHelper, WordsHelper, CookieCloudHelper, IndexerHelper
 from app.indexer import Indexer
 from app.media import Category, Media, Bangumi, DouBan
 from app.media.meta import MetaInfo, MetaBase
@@ -1045,17 +1045,21 @@ class WebAction:
 
         tid = data.get('site_id')
         name = data.get('site_name')
+        if __is_site_duplicate(name, tid):
+            return {"code": 400, "msg": "站点名称重复"}
+
         site_pri = data.get('site_pri')
         rssurl = data.get('site_rssurl')
         signurl = data.get('site_signurl')
         cookie = data.get('site_cookie')
         note = data.get('site_note')
-        if isinstance(note, dict):
-            note = json.dumps(note)
         rss_uses = data.get('site_include')
 
-        if __is_site_duplicate(name, tid):
-            return {"code": 400, "msg": "站点名称重复"}
+        indexer = IndexerHelper().get_indexer(signurl)
+        parser = indexer.parser if indexer and indexer.parser else ""
+        note["parser"] = parser
+        if isinstance(note, dict):
+            note = json.dumps(note)
 
         if tid:
             sites = self.dbhelper.get_site_by_id(tid)
