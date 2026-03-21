@@ -194,6 +194,7 @@ class SiteParserBase(metaclass=ABCMeta):
                 )
             # 解析用户做种信息
             self._parse_seeding_pages()
+            self.seeding_info = json.dumps(self.seeding_info)
         finally:
             # 关闭连接
             self.close()
