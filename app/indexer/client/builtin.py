@@ -158,9 +158,11 @@ class BuiltinIndexer(_IIndexClient):
                 imdb_id = match_media.imdb_id if match_media else None
                 result_array = Rarbg().search(keyword=search_word, indexer=indexer, imdb_id=imdb_id)
             elif indexer.parser == "MTSpider":
-                result_array = MTorrentSpider(indexer).search(keyword=search_word)
+                result_array = MTorrentSpider(indexer).search(keyword=search_word if match_media or in_from != SearchType.TG else key_word, 
+                                                              mtype=match_media.type if match_media else None, 
+                                                              in_from=in_from)
             elif indexer.parser == "RousiPro":
-                result_array = RousiSpider(indexer).search(keyword=search_word)
+                result_array = RousiSpider(indexer).search(keyword=search_word if match_media or in_from != SearchType.TG else key_word)
             elif indexer.parser == "TNodeSpider":
                 result_array = TNodeSpider(indexer=indexer).search(keyword=search_word)
             elif indexer.parser == "RenderSpider":
@@ -196,18 +198,14 @@ class BuiltinIndexer(_IIndexClient):
         if not indexer:
             return []
         if indexer.parser == "MTSpider":
-            return MTorrentSpider(indexer).search(keyword=keyword, page=page)
+            return MTorrentSpider(indexer).search(keyword=keyword, page=page, pagesize=100)
         elif indexer.parser == "RousiPro":
-            return RousiSpider(indexer).search(keyword=keyword, page=page)
+            return RousiSpider(indexer).search(keyword=keyword, page=page, pagesize=100)
         elif indexer.parser == "RenderSpider":
-            return RenderSpider().search(keyword=keyword,
-                                         indexer=indexer,
-                                         page=page)
+            return RenderSpider().search(keyword=keyword,indexer=indexer,page=page)
         elif indexer.parser == "TNodeSpider":
             return TNodeSpider(indexer=indexer).search(keyword=keyword, page=page)
-        return self.__spider_search(indexer=indexer,
-                                    page=page,
-                                    keyword=keyword)
+        return self.__spider_search(indexer=indexer,page=page,keyword=keyword)
 
     @staticmethod
     def __spider_search(indexer, keyword=None, page=None, mtype=None, timeout=30):

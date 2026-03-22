@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from config import Config, RMT_SUBEXT
 import log as logger
-from app.utils.types import MediaType
+from app.utils.types import MediaType, SearchType
 from app.helper import SiteHelper
 from app.utils import RequestUtils, StringUtils, PathUtils, ExceptionUtils
 
@@ -25,7 +25,7 @@ class MTorrentSpider:
     _proxy = None
     _cookie = None
     _ua = None
-    _size = 100
+    _size = 50
     _searchurl = "https://api.%s/api/torrent/search"
     _downloadurl = "https://api.%s/api/torrent/genDlToken"
     _subtitle_list_url = "https://api.%s/api/subtitle/list"
@@ -37,6 +37,7 @@ class MTorrentSpider:
     # 电影分类
     _movie_category = ['401', '419', '420', '421', '439', '405', '404']
     _tv_category = ['403', '402', '435', '438', '404', '405']
+    _ninekg_category = ["410","429","426","437","431","432","425"]
 
     # API KEY
     _apikey = None
@@ -68,24 +69,28 @@ class MTorrentSpider:
             self._ua = indexer.ua
             self._apikey = indexer.apikey
 
-    def __get_params(self, keyword: str, mtype: MediaType = None, page: Optional[int] = 0) -> dict:
+    def __get_params(self, keyword: str, mtype: MediaType = None, in_form: SearchType = None, page: Optional[int] = 0, pagesize: Optional[int] = None) -> dict:
         """
         获取请求参数
         """
-        if not mtype:
-            categories = []
+        if not mtype and in_form == SearchType.TG:
+            mode = "adult"
+            categories = self._ninekg_category
         elif mtype == MediaType.TV:
+            mode = "tvshow"
             categories = self._tv_category
         else:
+            mode = "movie"
             categories = self._movie_category
         # mtorrent搜索imdb需要输入完整imdb链接，参见 https://wiki.m-team.cc/zh-tw/imdbtosearch
         if keyword and keyword.startswith("tt"):
             keyword = f'https://www.imdb.com/title/{keyword}'
         return {
+            "mode": mode,
             "keyword": keyword,
             "categories": categories,
             "pageNumber": int(page) + 1,
-            "pageSize": self._size,
+            "pageSize": pagesize or self._size,
             "visible": 1
         }
 
@@ -150,7 +155,7 @@ class MTorrentSpider:
             torrents.append(torrent)
         return torrents
 
-    def search(self, keyword: str, mtype: MediaType = None, page: Optional[int] = 0) -> Tuple[bool, List[dict]]:
+    def search(self, keyword: str, mtype: MediaType = None, in_from: SearchType = None, page: Optional[int] = 0, pagesize: Optional[int] = None) -> Tuple[bool, List[dict]]:
         """
         搜索
         """
@@ -159,7 +164,7 @@ class MTorrentSpider:
             return []
 
         # 获取请求参数
-        params = self.__get_params(keyword, mtype, page)
+        params = self.__get_params(keyword, mtype, in_from, page, pagesize)
 
         # 发送请求
         res = RequestUtils(

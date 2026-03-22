@@ -25,7 +25,7 @@ class RousiSpider:
     _proxy = None
     _cookie = None
     _ua = None
-    _size = 100
+    _size = 50
     _searchurl = "https://%s/api/v1/torrents"
     _downloadurl = "https://%s/api/v1/torrents/%s"
     _timeout = 15
@@ -52,7 +52,7 @@ class RousiSpider:
             self._ua = indexer.ua
             self._apikey = indexer.apikey
 
-    def __get_params(self, keyword: str, mtype: MediaType = None, cat: Optional[str] = None, page: Optional[int] = 0) -> dict:
+    def __get_params(self, keyword: str, mtype: MediaType = None, cat: Optional[str] = None, page: Optional[int] = 0, pagesize: Optional[int] = None) -> dict:
         """
         构建 API 请求参数
 
@@ -64,7 +64,7 @@ class RousiSpider:
         """
         params = {
             "page": int(page) + 1,
-            "page_size": self._size
+            "page_size": pagesize or self._size
         }
         if keyword:
             params["keyword"] = keyword
@@ -204,7 +204,7 @@ class RousiSpider:
             torrents.append(torrent)
         return torrents
 
-    def search(self, keyword: str, mtype: MediaType = None, cat: Optional[str] = None, page: Optional[int] = 0) -> Tuple[bool, List[dict]]:
+    def search(self, keyword: str, mtype: MediaType = None, cat: Optional[str] = None, page: Optional[int] = 0, pagesize: Optional[int] = 0) -> Tuple[bool, List[dict]]:
         """
         同步搜索种子
 
@@ -218,7 +218,7 @@ class RousiSpider:
             logger.warn(f"{self._name} 未配置 API Key (Passkey)")
             return True, []
 
-        params = self.__get_params(keyword, mtype, cat, page)
+        params = self.__get_params(keyword, mtype, cat, page, pagesize)
         headers = {
             "Authorization": f"Bearer {self._apikey}",
             "Accept": "application/json"
