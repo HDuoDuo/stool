@@ -426,7 +426,7 @@ class DouBan:
 
             # 高清海报
             if poster_path:
-                poster_path = poster_path.replace("s_ratio_poster", "m_ratio_poster")
+                poster_path = "../image-proxy?url=" + poster_path.replace("s_ratio_poster", "m_ratio_poster")
 
             ret_infos.append({
                 'id': "DB:%s" % rid,

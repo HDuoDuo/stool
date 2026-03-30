@@ -12,7 +12,7 @@ from functools import wraps
 from math import floor
 from pathlib import Path
 from threading import Lock
-from urllib import parse
+import requests
 from icalendar import Calendar, Event, Alarm
 
 from flask import Flask, request, json, render_template, make_response, session, send_from_directory, send_file, Response
@@ -865,6 +865,34 @@ def service():
                            RuleGroups=RuleGroups,
                            SchedulerTasks=scheduler_cfg_list)
 
+
+@App.route('/image-proxy', methods=['POST', 'GET'])
+@login_required
+def proxy_image():
+    # 获取目标图片URL
+    image_url = request.args.get('url')
+    if "doubanio.com" in image_url:
+        headers = {
+            'Referer': 'https://movie.douban.com/'
+        }
+        try:
+            # 发起请求获取图片
+            response = requests.get(image_url, headers=headers, stream=True, timeout=10)
+            response.raise_for_status()
+            # 返回图片
+            return Response(
+                response.iter_content(chunk_size=2048),
+                content_type=response.headers.get('Content-Type', 'image/webp'),
+                headers={
+                    'Cache-Control': 'public, max-age=3600',  # 缓存1小时
+                    'Access-Control-Allow-Origin': '*'  # 允许跨域
+                }
+            )
+        except:
+            return ''
+    else:
+        return image_url
+    
 
 # 历史记录页面
 @App.route('/history', methods=['POST', 'GET'])
