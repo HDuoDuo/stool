@@ -64,6 +64,12 @@ class SiteConf:
             "HR":[],
             "PEER_COUNT":["//div[@id='peercount']/b[1]"]
         },
+        'cyanbug.net': {
+            "FREE":["//h1[@id='top']/b/font[@class='free']"],
+            "2XFREE":["//h1[@id='top']/b/font[@class='twoupfree']"],
+            "HR":[],
+            "PEER_COUNT":["//div[@id='peercount']/b[1]"]
+        },
         'jptv.club': {
             'FREE': ["//span/i[@class='fas fa-star text-gold']"],
             '2XFREE': [],
