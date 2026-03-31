@@ -574,16 +574,28 @@ class Sites:
                     return f"【{site}】签到失败！"
             # 模拟登录
             else:
+                parser = site_info.get("parser")
                 if site_url.find("attendance.php") != -1:
                     checkin_text = "签到"
+                elif parser == "RousiPro":
+                    checkin_text = "api签到"
                 else:
                     checkin_text = "模拟登录"
                 log.info(f"【Sites】开始站点{checkin_text}：{site}")
-                # 访问链接
-                res = RequestUtils(cookies=site_cookie,
-                                   headers=ua,
-                                   proxies=Config().get_proxies() if site_info.get("proxy") else None
-                                   ).get_res(url=site_url)
+                # TODO :特殊站点签到处理
+                res = None
+                if parser == "RousiPro":
+                    headers = {"User-Agent": ua,
+                               "Accept": "application/json, text/plain, */*",
+                               "Authorization": site_cookie if site_cookie.startswith("Bearer ") else f"Bearer {site_cookie}"}
+                    res = RequestUtils(headers=headers,
+                                       proxies=Config().get_proxies() if site_info.get("proxy") else None
+                                      ).post_res(url=site_url)
+                else:
+                    res = RequestUtils(cookies=site_cookie,
+                                       headers=ua,
+                                       proxies=Config().get_proxies() if site_info.get("proxy") else None
+                                      ).get_res(url=site_url)
                 if res and res.status_code == 200:
                     if not SiteHelper.is_logged_in(res.text):
                         log.warn(f"【Sites】{site} {checkin_text}失败，请检查Cookie")
