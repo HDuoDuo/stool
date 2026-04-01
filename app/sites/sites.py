@@ -588,16 +588,17 @@ class Sites:
                     headers = {"User-Agent": ua,
                                "Accept": "application/json, text/plain, */*",
                                "Authorization": site_cookie if site_cookie.startswith("Bearer ") else f"Bearer {site_cookie}"}
+                    signurl = StringUtils.get_base_url(site_url) + "/api/points/attendance"
                     res = RequestUtils(headers=headers,
                                        proxies=Config().get_proxies() if site_info.get("proxy") else None
-                                      ).post_res(url=site_url)
+                                      ).post_res(url=signurl)
                 else:
                     res = RequestUtils(cookies=site_cookie,
                                        headers=ua,
                                        proxies=Config().get_proxies() if site_info.get("proxy") else None
                                       ).get_res(url=site_url)
                 if res and res.status_code == 200:
-                    if not SiteHelper.is_logged_in(res.text):
+                    if not SiteHelper.is_logged_in(res.text) and parser != "RousiPro":
                         log.warn(f"【Sites】{site} {checkin_text}失败，请检查Cookie")
                         return f"【{site}】{checkin_text}失败，请检查Cookie！"
                     else:
