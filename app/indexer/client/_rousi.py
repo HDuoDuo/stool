@@ -183,7 +183,7 @@ class RousiSpider:
                 uploadvolumefactor = float(promotion.get('up_multiplier', 1.0))
                 # 促销到期时间，格式化为 YYYY-MM-DD HH:MM:SS
                 if promotion.get('until'):
-                    freedate = StringUtils.unify_datetime_str(promotion.get('until'))
+                    freedate = StringUtils.timestr_to_dayhour(promotion.get('until'))
 
             torrent = {
                 'title': result.get('title'),

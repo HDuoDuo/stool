@@ -353,6 +353,22 @@ class StringUtils:
         except Exception as e:
             ExceptionUtils.exception_traceback(e)
             return timestamp
+        
+    @staticmethod
+    def timestr_to_dayhour(timestr):
+        """
+        格式化时间字符串
+        :param 时间字符串:
+        :return: ?d?h
+        """
+        if timestr:
+            try:
+                timestamp = StringUtils.get_time_stamp(timestr)
+                return f' {timestamp.day}d {timestamp.hour}h'
+            except Exception as e:
+                ExceptionUtils.exception_traceback(e)
+                return timestr
+        return ''
 
     @staticmethod
     def to_bool(text, default_val: bool = False) -> bool:

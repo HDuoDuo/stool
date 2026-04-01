@@ -140,18 +140,18 @@ class MTorrentSpider:
                 'category': category
             }
             if discount_end_time := status.get('discountEndTime'):
-                torrent['freedate'] = StringUtils.timestamp_to_date(discount_end_time)
+                torrent['freedate'] = StringUtils.timestr_to_dayhour(discount_end_time)
             # 解析全站促销时的规则(当前馒头只有下载促销)
             if promotion_rule := status.get("promotionRule"):
                 discount = promotion_rule.get("discount", "NORMAL")
                 torrent["downloadvolumefactor"] = self.__get_downloadvolumefactor(discount)
                 if end_time := promotion_rule.get("endTime"):
-                    torrent["freedate"] = StringUtils.timestamp_to_date(end_time)
+                    torrent["freedate"] = StringUtils.timestr_to_dayhour(end_time)
             if mall_single_free := status.get("mallSingleFree"):
                 if mall_single_free.get("status") == "ONGOING":
                     torrent["downloadvolumefactor"] = self.__get_downloadvolumefactor("FREE")
                     if end_date := mall_single_free.get("endDate"):
-                        torrent["freedate"] = StringUtils.timestamp_to_date(end_date)
+                        torrent["freedate"] = StringUtils.timestr_to_dayhour(end_date)
             torrents.append(torrent)
         return torrents
 
