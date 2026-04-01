@@ -306,10 +306,12 @@ class Transmission(_IDownloadClient):
             labels = set(torrent.labels)
             if tags and (not labels or not set(tags).issubset(labels)):
                 continue
+            trackerdomain = StringUtils.get_url_domain(torrent.trackerStats[0].get("host")
+                                                       ).split(":")[0] if torrent.trackerStats else ""
             remove_torrents.append({
                 "id": torrent.id,
                 "name": torrent.name,
-                "site": torrent.trackers[0].get("sitename"),
+                "site": trackerdomain,
                 "size": torrent.total_size
             })
             remove_torrents_ids.append(torrent.id)
@@ -320,10 +322,12 @@ class Transmission(_IDownloadClient):
                 size = remove_torrent.get("size")
                 for torrent in torrents:
                     if torrent.name == name and torrent.total_size == size and torrent.id not in remove_torrents_ids:
+                        trackerdomain = StringUtils.get_url_domain(torrent.trackerStats[0].get("host")
+                                                           ).split(":")[0] if torrent.trackerStats else ""
                         remove_torrents_plus.append({
                             "id": torrent.id,
                             "name": torrent.name,
-                            "site": torrent.trackers[0].get("sitename") if torrent.trackers else "",
+                            "site": trackerdomain,
                             "size": torrent.total_size
                         })
             remove_torrents_plus += remove_torrents

@@ -295,7 +295,7 @@ class RousiSpider:
             "hr": False,
             "peer_count": 0
         }
-        # 从馒头的详情页网址中提取种子id
+        # 从详情页网址中提取种子id
         uuid_str = urlparse(link).path.rsplit("/", 1)[-1].strip()
         url = self._downloadurl % uuid_str
         headers = {
