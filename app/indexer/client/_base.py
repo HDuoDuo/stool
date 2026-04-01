@@ -335,6 +335,7 @@ class _IIndexClient(metaclass=ABCMeta):
             # 匹配到了
             log.info(
                 f"【{self.index_type}】{torrent_name} {description} 识别为 {media_info.get_title_string()} {media_info.get_season_episode_string()} 匹配成功")
+            labels = item.get("labels")
             media_info.set_torrent_info(site=indexer.name,
                                         site_order=order_seq,
                                         enclosure=enclosure,
@@ -347,7 +348,8 @@ class _IIndexClient(metaclass=ABCMeta):
                                         description=description,
                                         page_url=page_url,
                                         upload_volume_factor=uploadvolumefactor,
-                                        download_volume_factor=downloadvolumefactor)
+                                        download_volume_factor=downloadvolumefactor,
+                                        labels=labels)
             if media_info not in ret_array:
                 index_sucess += 1
                 ret_array.append(media_info)

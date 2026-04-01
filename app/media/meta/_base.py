@@ -57,6 +57,8 @@ class MetaBase(object):
     category = ""
     # 内容类型
     genre_ids = ""
+    # 内容标签
+    labels = []
     # TMDB ID
     tmdb_id = 0
     # IMDB ID
@@ -545,7 +547,8 @@ class MetaBase(object):
                          rssid=None,
                          hit_and_run=None,
                          imdbid=None,
-                         over_edition=None):
+                         over_edition=None,
+                         labels = None):
         if site:
             self.site = site
         if site_order:
@@ -580,6 +583,8 @@ class MetaBase(object):
             self.imdb_id = imdbid
         if over_edition is not None:
             self.over_edition = over_edition
+        if labels:
+            self.labels = labels
 
     # 整合下载参数
     def set_download_info(self, download_setting=None, save_path=None):

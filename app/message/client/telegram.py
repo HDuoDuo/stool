@@ -144,9 +144,10 @@ class Telegram(_IMessageClient):
                 if not image:
                     image = media.get_message_image()
                 if title.find("回复序号下载") != -1:
+                    messagetitle = f'[{media.labels[0]}]' + media.org_string if media.labels else media.org_string
                     caption = "%s\n%s\\. [%s](%s)\n__%s \\| %s \\| %s↑__" % (caption,
                                                                                 index,
-                                                                                self.formate_string(media.org_string),
+                                                                                self.formate_string(messagetitle),
                                                                                 self.formate_string(media.page_url),
                                                                                 self.formate_string(media.site),
                                                                                 self.formate_string(StringUtils.str_filesize(int(media.size))),
