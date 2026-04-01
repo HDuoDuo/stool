@@ -259,51 +259,50 @@ class Sync(object):
         """
         批量转移文件，由定时服务定期调用执行
         """
-        if not self._need_sync_paths:
-            return
-        syncSuccess = False
-        try:
-            lock.acquire()
-            finished_paths = []
-            for path in list(self._need_sync_paths):
-                if not PathUtils.is_invalid_path(path) and os.path.exists(path):
-                    log.info("【Sync】开始转移监控目录文件...")
-                    target_info = self._need_sync_paths.get(path)
-                    bluray_dir = PathUtils.get_bluray_dir(path)
-                    if not bluray_dir:
-                        src_path = path
-                        files = target_info.get('files')
-                    else:
-                        src_path = bluray_dir
-                        files = []
-                    if src_path not in finished_paths:
-                        finished_paths.append(src_path)
-                    else:
-                        continue
-                    target_path = target_info.get('target')
-                    unknown_path = target_info.get('unknown')
-                    sync_mode = target_info.get('syncmod')
-                    # 判断是否根目录
-                    is_root_path = False
-                    for m_path in self.sync_dir_config.keys():
-                        if os.path.normpath(m_path) == os.path.normpath(src_path):
-                            is_root_path = True
-                    ret, ret_msg = self.filetransfer.transfer_media(in_from=SyncType.MON,
-                                                                    in_path=src_path,
-                                                                    files=files,
-                                                                    target_dir=target_path,
-                                                                    unknown_dir=unknown_path,
-                                                                    rmt_mode=sync_mode,
-                                                                    root_path=is_root_path)
-                    if not ret:
-                        log.warn("【Sync】%s转移失败：%s" % (path, ret_msg))
-                    else:
-                        syncSuccess = True
-                self._need_sync_paths.pop(path)
-        finally:
-            lock.release()
-            if syncSuccess:
-                self.syncdone()
+        if self._need_sync_paths:
+            syncSuccess = False
+            try:
+                lock.acquire()
+                finished_paths = []
+                for path in list(self._need_sync_paths):
+                    if not PathUtils.is_invalid_path(path) and os.path.exists(path):
+                        log.info("【Sync】开始转移监控目录文件...")
+                        target_info = self._need_sync_paths.get(path)
+                        bluray_dir = PathUtils.get_bluray_dir(path)
+                        if not bluray_dir:
+                            src_path = path
+                            files = target_info.get('files')
+                        else:
+                            src_path = bluray_dir
+                            files = []
+                        if src_path not in finished_paths:
+                            finished_paths.append(src_path)
+                        else:
+                            continue
+                        target_path = target_info.get('target')
+                        unknown_path = target_info.get('unknown')
+                        sync_mode = target_info.get('syncmod')
+                        # 判断是否根目录
+                        is_root_path = False
+                        for m_path in self.sync_dir_config.keys():
+                            if os.path.normpath(m_path) == os.path.normpath(src_path):
+                                is_root_path = True
+                        ret, ret_msg = self.filetransfer.transfer_media(in_from=SyncType.MON,
+                                                                        in_path=src_path,
+                                                                        files=files,
+                                                                        target_dir=target_path,
+                                                                        unknown_dir=unknown_path,
+                                                                        rmt_mode=sync_mode,
+                                                                        root_path=is_root_path)
+                        if not ret:
+                            log.warn("【Sync】%s转移失败：%s" % (path, ret_msg))
+                        else:
+                            syncSuccess = True
+                    self._need_sync_paths.pop(path)
+            finally:
+                lock.release()
+                if syncSuccess:
+                    self.syncdone()
 
     @staticmethod
     def syncdone():

@@ -363,12 +363,22 @@ class StringUtils:
         """
         if timestr:
             try:
-                timestamp = StringUtils.get_time_stamp(timestr)
-                return f' {timestamp.day}d {timestamp.hour}h'
+                timestr = dateparser.parse(timestr).strftime('%Y-%m-%d %H:%M:%S')
+                future_time = datetime.datetime.strptime(timestr, "%Y-%m-%d %H:%M:%S")
+                now = datetime.datetime.now()
+                if future_time > now:
+                    time_diff = future_time - now
+                    days = time_diff.days
+                    hours = time_diff.seconds // 3600
+                    if days and hours:
+                        timestr = f' {days}d {hours}h'
+                    elif days and not hours:
+                        timestr = f' {days}d'
+                    else:
+                        timestr = f' {hours}h'
             except Exception as e:
                 ExceptionUtils.exception_traceback(e)
-                return timestr
-        return ''
+        return timestr
 
     @staticmethod
     def to_bool(text, default_val: bool = False) -> bool:
