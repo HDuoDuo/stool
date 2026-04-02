@@ -103,12 +103,16 @@ class MTorrentSpider:
             return torrents
 
         for result in results:
+            genre_ids = None
             category_value = result.get('category')
             if category_value in self._tv_category \
                     and category_value not in self._movie_category:
                 category = MediaType.TV.value
             elif category_value in self._movie_category:
                 category = MediaType.MOVIE.value
+            elif category_value in self._ninekg_category:
+                category = MediaType.MOVIE.value
+                genre_ids = "6000"
             else:
                 category = MediaType.UNKNOWN.value
             # 处理馒头新版标签
@@ -137,7 +141,8 @@ class MTorrentSpider:
                 'page_url': self._pageurl % (self._url, result.get('id')),
                 'imdbid': self.__find_imdbid(result.get('imdb')),
                 'labels': labels,
-                'category': category
+                'category': category,
+                'genre_ids': genre_ids
             }
             if discount_end_time := status.get('discountEndTime'):
                 torrent['freedate'] = StringUtils.timestr_to_dayhour(discount_end_time)

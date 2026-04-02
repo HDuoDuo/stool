@@ -34,6 +34,7 @@ class RousiSpider:
     # API 不支持多分类搜索，每次只使用一个分类
     _movie_category = 'movie'
     _tv_category = 'tv'
+    _ninekg_category = '9kg'
 
     # API KEY
     _apikey = None
@@ -154,20 +155,22 @@ class RousiSpider:
             # 解析分类信息
             raw_cat = result.get('category')
             cat_val = None
-
+            genre_ids = None
             category = MediaType.UNKNOWN.value
 
             if isinstance(raw_cat, dict):
                 cat_val = raw_cat.get('slug') or raw_cat.get('name')
             elif isinstance(raw_cat, str):
                 cat_val = raw_cat
-
             if cat_val:
                 cat_val = str(cat_val).lower()
                 if cat_val == self._movie_category:
                     category = MediaType.MOVIE.value
                 elif cat_val == self._tv_category:
                     category = MediaType.TV.value
+                elif cat_val == self._ninekg_category:
+                    category = MediaType.MOVIE.value
+                    genre_ids = "6000"
                 else:
                     category = MediaType.UNKNOWN.value
 
@@ -199,7 +202,8 @@ class RousiSpider:
                 'freedate': freedate,
                 'page_url': f"https://{self._domain}/torrent/{result.get('uuid')}",
                 'labels': [],
-                'category': category
+                'category': category,
+                'genre_ids': genre_ids
             }
             torrents.append(torrent)
         return torrents

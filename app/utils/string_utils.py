@@ -374,8 +374,11 @@ class StringUtils:
                         timestr = f' {days}d {hours}h'
                     elif days and not hours:
                         timestr = f' {days}d'
-                    else:
+                    elif not days and hours:
                         timestr = f' {hours}h'
+                    else:
+                        minutes = time_diff.seconds // 60
+                        timestr = f' {minutes}m'
             except Exception as e:
                 ExceptionUtils.exception_traceback(e)
         return timestr
