@@ -498,6 +498,7 @@ class WebAction:
         site = data.get("site")
         enclosure = data.get("enclosure")
         title = data.get("title")
+        genre_ids = data.get("genre_ids")
         description = data.get("description")
         page_url = data.get("page_url")
         size = data.get("size")
@@ -511,6 +512,7 @@ class WebAction:
         media = Media().get_media_info(title=title, subtitle=description)
         media.site = site
         media.enclosure = enclosure
+        media.genre_ids = genre_ids
         media.page_url = page_url
         media.size = size
         media.upload_volume_factor = float(uploadvolumefactor)

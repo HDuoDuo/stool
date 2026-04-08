@@ -82,6 +82,7 @@
                       <input class="form-check-input m-0 align-middle" name="resources_item" value="{{ loop.index0 }}" type="checkbox">
                       <input type="hidden" id="enclosure_{{ loop.index0 }}" value="{{ Result.enclosure }}">
                       <input type="hidden" id="title_{{ loop.index0 }}" value="{{ Result.title }}">
+                      <input type="hidden" id="genre_ids_{{ loop.index0 }}" value="{{ Result.genre_ids }}">
                       <input type="hidden" id="description_{{ loop.index0 }}" value="{{ Result.description }}">
                       <input type="hidden" id="page_url_{{ loop.index0 }}" value="{{ Result.page_url }}">
                       <input type="hidden" id="size_{{ loop.index0 }}" value="{{ Result.size }}">
@@ -212,6 +213,7 @@
     const site = "{{ Title }}";
     const enclosure = $(`#enclosure_${id}`).val();
     const title = $(`#title_${id}`).val();
+    const genre_ids = $(`#genre_ids_${id}`).val();
     const description = $(`#description_${id}`).val();
     const page_url = $(`#page_url_${id}`).val();
     const size = $(`#size_${id}`).val();
@@ -224,6 +226,7 @@
       site: site,
       enclosure: enclosure,
       title: title,
+      genre_ids: genre_ids,
       dl_dir: $("#search_download_dir").val(),
       dl_setting: $("#search_download_setting").val(),
       description: description,
