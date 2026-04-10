@@ -187,7 +187,8 @@ class Fanart:
             self.__get_fanart_images(media_type=media_type, queryid=queryid)
         if media_type != MediaType.TV:
             return None
-        return self._images.get("seasonposter", {}).get(season, "") or default
+        seasondict = self._images.get("seasonposter", {})
+        return seasondict.get(season, default) if isinstance(seasondict, dict) else default
 
     def get_seasonthumb(self, media_type, queryid, season, default=None):
         """
