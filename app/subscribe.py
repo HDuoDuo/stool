@@ -188,6 +188,7 @@ class Subscribe:
             media_info = MetaInfo(title=name, mtype=mtype)
             media_info.title = name
             media_info.type = mtype
+            media_info.year = year
             if season:
                 media_info.begin_season = int(season)
             if mtype == MediaType.MOVIE:

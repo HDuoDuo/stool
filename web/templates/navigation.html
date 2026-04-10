@@ -1318,12 +1318,18 @@
   }
   $("#rss_season").empty().append(rss_season_content);
 
+   var rss_name = "";
+   var rss_year = "";
   // 选择模糊匹配
   function change_match_check(obj) {
     if ($(obj).prop("checked")) {
+      $("#rss_name").val(rss_name).attr("readonly", false);
+      $("#rss_year").val(rss_year).attr("readonly", false);
       $("#rss_search_sites_div").hide();
       $("#over_edition").prop("checked", false);
     } else {
+      $("#rss_name").val(rss_name).attr("readonly", true);
+      $("#rss_year").val(rss_year).attr("readonly", true);
       $("#rss_search_sites_div").show();
     }
   }
@@ -1331,6 +1337,8 @@
   // 选择洗版
   function change_over_edition_check(obj) {
     if ($(obj).prop("checked")) {
+      $("#rss_name").val(rss_name).attr("readonly", true);
+      $("#rss_year").val(rss_year).attr("readonly", true);
       $("#fuzzy_match").prop("checked", false);
       $("#rss_search_sites_div").show();
     }
@@ -1425,8 +1433,11 @@
     ajax_post("rss_detail", {"rssid": rssid, "rsstype": type}, function (ret) {
       if (ret.code === 0) {
         $("#rss_tmdbid").val(ret.detail.tmdbid);
-        $("#rss_name").val(ret.detail.name).attr("readonly", true);
-        $("#rss_year").val(ret.detail.year).attr("readonly", true);
+        let no_fuzzy_match = ret.detail.fuzzy_match ? false : true
+        rss_name = ret.detail.name;
+        rss_year = ret.detail.year;
+        $("#rss_name").val(rss_name).attr("readonly", no_fuzzy_match);
+        $("#rss_year").val(rss_year).attr("readonly", no_fuzzy_match);
         $("#rss_keyword").val(ret.detail.keyword);
         if (type == "MOV" || type == "电影") {
           $("#rss_tv_season_div").hide();
@@ -1451,8 +1462,8 @@
             $("#rss_current_ep").val("");
           }
         }
-        if (!ret.detail.fuzzy_match) {
-          $("#fuzz_match").prop("checked", false);
+        if (no_fuzzy_match) {
+          $("#fuzzy_match").prop("checked", false);
           $("#rss_search_sites_div").show();
         } else {
           $("#fuzzy_match").prop("checked", true);
@@ -1483,7 +1494,7 @@
         $("[name='rss_add_btn']").hide();
         $("[name='rss_edit_btn']").show();
         $("#rss_delete_btn").attr("href",
-            `javascript:remove_rss_manual('${ret.detail.type}','${ret.detail.name}','${ret.detail.year}','${rssid}')`)
+            `javascript:remove_rss_manual('${ret.detail.type}','${rss_name}','${rss_year}','${rssid}')`)
             .show();
         $("#modal-manual-rss").modal('show');
       }
