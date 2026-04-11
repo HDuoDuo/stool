@@ -1111,14 +1111,13 @@ class Media:
           "vote_count": 2291
         }
         """
-        if not self.movie:
+        if not self.movie or not tmdbid:
             return {}
         try:
-            log.info("【Meta】正在查询TMDB电影：%s ..." % tmdbid)
             tmdbinfo = self.movie.details(tmdbid, append_to_response)
             return tmdbinfo or {}
         except Exception as e:
-            log.info(f"【Meta】：{str(e)}")
+            log.info(f"【Meta】查询{tmdbid}电影INFO:{str(e)}")
             return None
 
     def __get_tmdb_tv_detail(self, tmdbid, append_to_response=None):
@@ -1359,14 +1358,13 @@ class Media:
           "season_number": 1
         }
         """
-        if not self.tv:
+        if not self.tv or not tmdbid:
             return {}
         try:
-            log.info("【Meta】正在查询TMDB电视剧：%s，季：%s ..." % (tmdbid, season))
             tmdbinfo = self.tv.season_details(tmdbid, season)
             return tmdbinfo or {}
         except Exception as e:
-            log.info(f"【Meta】：{str(e)}")
+            log.info(f"【Meta】查询{tmdbid}电视剧季INFO:{str(e)}")
             return {}
 
     def get_tmdb_tv_seasons_byid(self, tmdbid):
