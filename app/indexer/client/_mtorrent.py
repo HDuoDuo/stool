@@ -256,11 +256,40 @@ class MTorrentSpider:
         base64_str = base64.b64encode(json.dumps(params).encode('utf-8')).decode('utf-8')
         return f'[{base64_str}]{url}'
     
+    def get_download_url_by_link(self, link: str) -> str:
+        """
+        使用详情页地址获取下载链接，返回base64编码的json字符串及URL
+        """
+        torrentid = urlparse(link).path.rsplit("/", 1)[-1].strip()
+        return self.__get_download_url(torrentid)
+    
+    def get_enclosure_by_link(self, link: str) -> str:
+        """
+        使用详情页地址获取enclosure，返回enclosure
+        """
+        enclosure = None
+        torrentid = urlparse(link).path.rsplit("/", 1)[-1].strip()
+        url = self._downloadurl % self._domain
+        params = {'id': torrentid}
+        header =  {'User-Agent': f'{self._ua}',
+                   'Accept': 'application/json, text/plain, */*',
+                   'x-api-key': self._apikey}
+        # POST请求
+        res = RequestUtils(
+            headers=header,
+            proxies=Config().get_proxies() if self._proxy else None
+        ).post_res(url, params=params)
+        if res:
+            data = res.json().get("data")
+            if data:
+                enclosure = data
+        return enclosure
+
     def download_subtitles_by_pageurl(self, page_url: str, meta_name: str, download_dir: str):
         addr = urlparse(page_url)
-        logger.info(f"【MTorrentSpider】下载馒头字幕 {page_url}")
+        logger.info(f"【MTorrentSpider】下载字幕 {page_url}")
         if not self._apikey:
-            logger.warn(f"【MTorrentSpider】 获取馒头字幕失败, 未设置站点Api-Key")
+            logger.warn(f"【MTorrentSpider】 获取字幕失败, 未设置站点Api-Key")
             return
         # 从馒头的详情页网址中提取种子id
         torrent_id = urlparse(page_url).path.rsplit("/", 1)[-1].strip()
@@ -309,7 +338,7 @@ class MTorrentSpider:
             else:
                 file_name = (spli_filename[0]+'.chi'+spli_filename[-1]) if lang == "25" and ".chi." not in filename else filename
             if not file_name:
-                logger.warn(f"【MTorrentSpider】 馒头{torrentid} 字幕文件非法：{subtitle_id}")
+                logger.warn(f"【MTorrentSpider】 {torrentid} 字幕文件非法：{subtitle_id}")
                 return
             save_tmp_path = Config().get_temp_path()
             if file_name.lower().endswith((".zip", ".tar")):
@@ -324,7 +353,7 @@ class MTorrentSpider:
                 # 遍历转移文件
                 for sub_file in PathUtils.get_dir_files(in_path=zip_path, exts=RMT_SUBEXT):
                     target_sub_file = os.path.join(download_dir,os.path.basename(sub_file))
-                    logger.info(f"【MTorrentSpider】 馒头{torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
+                    logger.info(f"【MTorrentSpider】 {torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
                     SiteHelper.transfer_subtitle(sub_file, target_sub_file)
                 # 删除临时文件
                 try:
@@ -338,12 +367,12 @@ class MTorrentSpider:
                 with open(sub_file, 'wb') as f:
                     f.write(res.content)
                 target_sub_file = os.path.join(download_dir,os.path.basename(sub_file))
-                logger.info(f"【MTorrentSpider】 馒头{torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
+                logger.info(f"【MTorrentSpider】 {torrentid} 转移字幕 {sub_file} 到 {target_sub_file}")
                 SiteHelper.transfer_subtitle(sub_file, target_sub_file)
         elif res is not None:
-            logger.warn(f"【MTorrentSpider】 下载馒头{torrentid}字幕 {filename} 失败，错误码：{res.status_code}")
+            logger.warn(f"【MTorrentSpider】 下载{torrentid}字幕 {filename} 失败，错误码：{res.status_code}")
         else:
-            logger.warn(f"【MTorrentSpider】 下载馒头{torrentid}字幕 {filename} 失败，无法连接 {download_url}")   
+            logger.warn(f"【MTorrentSpider】 下载{torrentid}字幕 {filename} 失败，无法连接 {download_url}")   
 
     def __get_subtitles_info_by_id(self, torrent_id: str, meta_name: str) -> Optional[List[str]]:
         """
@@ -413,24 +442,21 @@ class MTorrentSpider:
             return None
 
     # 获取种子的促销详情
-    def check_torrent_attr(self, torrent_url):
+    def check_torrent_attr(self, link):
         ret_attr = {
             "free": False,
             "2xfree": False,
             "hr": False,
             "peer_count": 0
         }
-        addr = urlparse(torrent_url)
-        # /detail/770**
-        m = re.match("/detail/([0-9]+)", addr.path)
-        if not m:
-            logger.warn(f"【MTorrentSpider】 获取馒头种子属性失败 path：{addr.path}")
+        torrentid = int(urlparse(link).path.rsplit("/", 1)[-1].strip())
+        if not torrentid:
+            logger.warn(f"【MTorrentSpider】 从 {link} 中提取ID失败")
             return ret_attr
-        torrentid = int(m.group(1))
         if not self._apikey:
-            logger.warn("【MTorrentSpider】 获取馒头种子属性失败, 未设置站点Api-Key")
+            logger.warn("【MTorrentSpider】 获取种子属性失败, 未设置站点Api-Key")
             return ret_attr
-        site_url = "%s/api/torrent/detail" % StringUtils.get_base_url(torrent_url).replace("kp", "api")
+        site_url = "%s/api/torrent/detail" % StringUtils.get_base_url(link).replace("kp", "api")
         res = RequestUtils(
             headers={
                 'x-api-key': self._apikey,
@@ -444,7 +470,7 @@ class MTorrentSpider:
         if res and res.status_code == 200:
             msg = res.json().get('message')
             if msg != "SUCCESS":
-                logger.warn(f"【MTorrentSpider】 获取馒头种子{torrentid}属性失败：{msg}")
+                logger.warn(f"【MTorrentSpider】 获取种子{torrentid}属性失败：{msg}")
                 return ret_attr
             result = res.json().get('data', {})
             status = result.get('status')
@@ -464,7 +490,7 @@ class MTorrentSpider:
             elif discount == "FREE":
                 ret_attr["free"] = True
         elif res is not None:
-            logger.warn(f"【MTorrentSpider】 获取馒头种子{torrentid}属性失败，错误码：{res.status_code}")
+            logger.warn(f"【MTorrentSpider】 获取种子{torrentid}属性失败，错误码：{res.status_code}")
         else:
-            logger.warn(f"【MTorrentSpider】 获取馒头种子{torrentid}属性失败，无法连接 {site_url}")
+            logger.warn(f"【MTorrentSpider】 获取种子{torrentid}属性失败，无法连接 {site_url}")
         return ret_attr

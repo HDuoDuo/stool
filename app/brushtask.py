@@ -168,6 +168,7 @@ class BrushTask(object):
             return
 
         site_name = site_info.get("name")
+        parser = site_info.get("parser")
         site_ratio_limit = self.sites.ratio_beyong(site_name)
         self._ratio_limit.update({site_name: site_ratio_limit})
         if site_ratio_limit:
@@ -234,10 +235,20 @@ class BrushTask(object):
                                              cookie=cookie,
                                              siteid=site_id,
                                              ua=ua,
-                                             parser=site_info.get("parser"),
+                                             parser=parser,
                                              apikey=apikey,
                                              proxy=site_proxy):
                     continue
+                
+                # TODO :特殊站点处理enclosure
+                if parser == "MTSpider":
+                    indexer = IndexerHelper().get_indexer(StringUtils.get_url_domain(page_url),
+                                                          cookie=cookie,
+                                                          ua=ua,
+                                                          apikey=apikey,
+                                                          proxy=site_proxy)
+                    enclosure = MTorrentSpider(indexer).get_enclosure_by_link(page_url)
+
                 # 开始下载
                 log.debug("【Brush】%s 符合条件，开始下载..." % torrent_name)
                 if self.__download_torrent(downloadercfg=downloader_cfg,
@@ -759,7 +770,19 @@ class BrushTask(object):
                 if re.search(r"%s" % rss_rule.get("exclude"), title):
                     return False
             
-            # TODO :特殊站点特殊处理
+            # 检查发布时间
+            if rss_rule.get("pubdate") and pubdate:
+                rule_pubdates = rss_rule.get("pubdate").split("#")
+                if len(rule_pubdates) >= 2 and rule_pubdates[1]:
+                    localtz = pytz.timezone(Config().get_timezone())
+                    localnowtime = datetime.now().astimezone(localtz)
+                    localpubdate = pubdate.astimezone(localtz)
+                    log.debug('【Brush】发布时间：%s，当前时间：%s' % (localpubdate.isoformat(), localnowtime.isoformat()))
+                    if (localnowtime - localpubdate).seconds / 3600 > float(rule_pubdates[1]):
+                        log.debug("【Brush】发布时间不符合条件。")
+                        return False
+
+            # TODO :特殊站点处理
             torrent_attr = None
             if parser == "MTSpider":
                 indexer = IndexerHelper().get_indexer(StringUtils.get_url_domain(torrent_url),
@@ -831,17 +854,6 @@ class BrushTask(object):
                             title, min_count, peer_counts[0], torrent_peer_count, peer_counts[0], max_count))
                         return False
 
-            # 检查发布时间
-            if rss_rule.get("pubdate") and pubdate:
-                rule_pubdates = rss_rule.get("pubdate").split("#")
-                if len(rule_pubdates) >= 2 and rule_pubdates[1]:
-                    localtz = pytz.timezone(Config().get_timezone())
-                    localnowtime = datetime.now().astimezone(localtz)
-                    localpubdate = pubdate.astimezone(localtz)
-                    log.debug('【Brush】发布时间：%s，当前时间：%s' % (localpubdate.isoformat(), localnowtime.isoformat()))
-                    if (localnowtime - localpubdate).seconds / 3600 > float(rule_pubdates[1]):
-                        log.debug("【Brush】发布时间不符合条件。")
-                        return False
 
         except Exception as err:
             ExceptionUtils.exception_traceback(err)

@@ -1286,14 +1286,13 @@ class Media:
           "vote_count": 601
         }
         """
-        if not self.tv:
+        if not self.tv or not tmdbid:
             return {}
         try:
-            log.info("【Meta】正在查询TMDB电视剧：%s ..." % tmdbid)
             tmdbinfo = self.tv.details(tmdbid, append_to_response)
             return tmdbinfo or {}
         except Exception as e:
-            log.info(f"【Meta】：{str(e)}")
+            log.info(f"【Meta】查询{tmdbid}电视剧INFO:{str(e)}")
             return None
 
     def get_tmdb_tv_season_detail(self, tmdbid, season: int):

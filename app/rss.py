@@ -94,7 +94,7 @@ class Rss:
                 check_sites = list(set(check_sites))
 
             # 匹配到的资源列表
-            rss_download_torrents = []
+            rss_download_torrents = {"fuzzy_match": [], "no_fuzzy_match": []}
             # 缺失的资源详情
             rss_no_exists = {}
             # 遍历站点资源
@@ -148,7 +148,7 @@ class Rss:
                         # 开始处理
                         log.info(f"【Rss】开始处理：{title}")
                         # 检查这个种子是不是下过了
-                        if self.dbhelper.is_torrent_rssd(enclosure):
+                        if self.dbhelper.is_torrent_rssd(enclosure) or self.dbhelper.is_userrss_finished(title, ""):
                             log.info(f"【Rss】{title} 已成功订阅过")
                             continue
                         # 识别种子名称，开始检索TMDB
@@ -193,8 +193,9 @@ class Rss:
                         if not match_flag:
                             continue
 
+                        fuzzy_match = match_info.get("fuzzy_match")
                         # 非模糊匹配命中，检查本地情况，检查删除订阅
-                        if not match_info.get("fuzzy_match"):
+                        if not fuzzy_match:
                             # 匹配到订阅，如没有TMDB信息则重新查询
                             if not media_info.tmdb_info and media_info.tmdb_id:
                                 media_info.set_tmdb_info(self.media.get_tmdb_info(mtype=media_info.type,
@@ -274,10 +275,6 @@ class Rss:
                                         f"正在洗版，跳过低优先级或同优先级资源：{title}"
                                     )
                                     continue
-                        # 模糊匹配
-                        else:
-                            # 不做处理，直接下载
-                            pass
 
                         # 设置种子信息
                         media_info.set_torrent_info(res_order=match_info.get("res_order"),
@@ -292,15 +289,18 @@ class Rss:
                         # 插入数据库历史记录
                         self.dbhelper.insert_rss_torrents(media_info)
                         # 加入下载列表
-                        if media_info not in rss_download_torrents:
-                            rss_download_torrents.append(media_info)
+                        if media_info not in rss_download_torrents["fuzzy_match"] and media_info not in rss_download_torrents["no_fuzzy_match"]:
+                            if fuzzy_match:
+                                rss_download_torrents["fuzzy_match"].append(media_info)
+                            else:
+                                rss_download_torrents["no_fuzzy_match"].append(media_info)
                             res_num = res_num + 1
                     except Exception as e:
                         ExceptionUtils.exception_traceback(e)
                         log.error("【Rss】处理RSS发生错误：%s" % str(e))
                         continue
                 log.info("【Rss】%s 处理结束，匹配到 %s 个有效资源" % (site_name, res_num))
-            log.info("【Rss】所有RSS处理结束，共 %s 个有效资源" % len(rss_download_torrents))
+            log.info("【Rss】所有RSS处理结束，共 %s 个有效资源" % (len(rss_download_torrents["fuzzy_match"]) + len(rss_download_torrents["no_fuzzy_match"])))
             # 开始择优下载
             self.download_rss_torrent(rss_download_torrents=rss_download_torrents,
                                       rss_no_exists=rss_no_exists)
@@ -354,10 +354,6 @@ class Rss:
                         enclosure = DomUtils.tag_value(item, "enclosure", "url", default="")
                         if not enclosure and not link:
                             continue
-                        # 部分RSS只有link没有enclosure
-                        if not enclosure and link:
-                            enclosure = link
-                            link = None
                         # 大小
                         size = DomUtils.tag_value(item, "enclosure", "length", default=0)
                         if size and str(size).isdigit():
@@ -371,7 +367,7 @@ class Rss:
                             pubdate = StringUtils.get_time_stamp(pubdate)
                         # 返回对象
                         tmp_dict = {'title': title,
-                                    'enclosure': enclosure,
+                                    'enclosure': enclosure or link, # 部分RSS没有enclosure
                                     'size': size,
                                     'description': description,
                                     'link': link,
@@ -508,32 +504,33 @@ class Rss:
                 break
         # 名称匹配成功，开始过滤
         if match_flag:
+            page_url = media_info.page_url
+            spider = None
+            # TODO :特殊站点
+            if site_parser in ["MTSpider", "RousiPro"]:
+                indexer = IndexerHelper().get_indexer(StringUtils.get_url_domain(page_url),
+                                                      cookie=site_cookie,
+                                                      ua=site_ua,
+                                                      apikey=site_apikey,
+                                                      proxy=site_proxy)
+                if site_parser == "MTSpider":
+                    spider = MTorrentSpider(indexer)
+                elif site_parser == "RousiPro":
+                    spider = RousiSpider(indexer)
+
             # 解析种子详情
             if site_parse:
                 # 检测Free
-                # TODO :特殊站点特殊处理
+                # TODO :特殊站点处理torrent_attr
                 torrent_attr = None
-                page_url = media_info.page_url
-                if site_parser == "MTSpider":
-                    indexer = IndexerHelper().get_indexer(StringUtils.get_url_domain(page_url),
-                                                          cookie=site_cookie,
-                                                          ua=site_ua,
-                                                          apikey=site_apikey,
-                                                          proxy=site_proxy)
-                    torrent_attr = MTorrentSpider(indexer).check_torrent_attr(page_url)
-                elif site_parser == "RousiPro":
-                    indexer = IndexerHelper().get_indexer(StringUtils.get_url_domain(page_url),
-                                                          cookie=site_cookie,
-                                                          ua=site_ua,
-                                                          apikey=site_apikey,
-                                                          proxy=site_proxy)
-                    torrent_attr = RousiSpider(indexer).check_torrent_attr(page_url)
+                if spider:
+                    torrent_attr = spider.check_torrent_attr(page_url)
                 else:
                     torrent_attr = self.sites.check_torrent_attr(page_url,
-                                                                site_cookie,
-                                                                ua=site_ua,
-                                                                apikey=site_apikey,
-                                                                proxy=site_proxy)
+                                                                 site_cookie,
+                                                                 ua=site_ua,
+                                                                 apikey=site_apikey,
+                                                                 proxy=site_proxy)
                 if torrent_attr.get('2xfree'):
                     download_volume_factor = 0.0
                     upload_volume_factor = 2.0
@@ -567,12 +564,15 @@ class Rss:
                     media_info.org_string,
                     media_info.get_title_string(),
                     media_info.get_season_episode_string()))
-                match_msg.append(f"种子描述：{media_info.subtitle}")
                 match_rss_info.update({
                     "res_order": res_order,
                     "filter_rule": filter_rule,
                     "upload_volume_factor": upload_volume_factor,
                     "download_volume_factor": download_volume_factor})
+                # TODO :特殊站点可能没有enclosure,需获取
+                if spider and site_parser == "MTSpider":
+                    media_info.enclosure = spider.get_download_url_by_link(page_url)
+                
                 return True, match_msg, match_rss_info
         else:
             match_msg.append("%s 识别为 %s %s 不在订阅范围" % (
@@ -635,24 +635,41 @@ class Rss:
                                                          rssid=download_item.rssid,
                                                          media=download_item)
 
-        # 去重择优后开始添加下载
-        download_items, left_medias = self.downloader.batch_download(SearchType.RSS,
-                                                                     rss_download_torrents,
-                                                                     rss_no_exists)
-        # 批量删除订阅
-        if download_items:
-            for item in download_items:
-                if not item.rssid:
-                    continue
-                if item.over_edition:
-                    # 更新洗版订阅
-                    __update_over_edition(item)
-                elif not left_medias or not left_medias.get(item.tmdb_id):
-                    # 删除电视剧订阅
-                    __finish_rss(item)
-                else:
-                    # 更新电视剧缺失剧集
-                    __update_tv_rss(item, left_medias.get(item.tmdb_id))
-            log.info("【Rss】实际下载了 %s 个资源" % len(download_items))
+        fuzzy_rss_download_torrents: list = rss_download_torrents["fuzzy_match"]
+        no_fuzzy_rss_download_torrents: list = rss_download_torrents["no_fuzzy_match"]
+
+        fuzzy_match_downloaded_items = 0
+        if len(fuzzy_rss_download_torrents) > 0:
+            for media_info in fuzzy_rss_download_torrents:
+                ret, _ = self.downloader.download(media_info=media_info)
+                if ret:
+                    fuzzy_match_downloaded_items += 1
+
+        no_fuzzy_match_downloaded_items = 0
+        if len(no_fuzzy_rss_download_torrents) > 0:
+            # 去重择优后开始添加下载
+            download_items, left_medias = self.downloader.batch_download(SearchType.RSS,
+                                                                         no_fuzzy_rss_download_torrents,
+                                                                         rss_no_exists)
+            no_fuzzy_match_downloaded_items = len(download_items)
+            # 批量删除订阅
+            if download_items:
+                for item in download_items:
+                    if not item.rssid:
+                        continue
+                    if item.over_edition:
+                        # 更新洗版订阅
+                        __update_over_edition(item)
+                    elif not left_medias or not left_medias.get(item.tmdb_id):
+                        # 删除电视剧订阅
+                        __finish_rss(item)
+                    else:
+                        # 更新电视剧缺失剧集
+                        __update_tv_rss(item, left_medias.get(item.tmdb_id))
+            
+
+        download_count = no_fuzzy_match_downloaded_items + fuzzy_match_downloaded_items
+        if download_count:
+            log.info("【Rss】实际下载了 %s 个资源" % download_count)
         else:
             log.info("【Rss】未下载到任何资源")
