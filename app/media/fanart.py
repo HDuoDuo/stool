@@ -188,7 +188,7 @@ class Fanart:
         if media_type != MediaType.TV:
             return None
         seasondict = self._images.get("seasonposter", {})
-        return seasondict.get(season, default) if isinstance(seasondict, dict) else default
+        return seasondict.get(season, "") if isinstance(seasondict, dict) else default
 
     def get_seasonthumb(self, media_type, queryid, season, default=None):
         """
@@ -200,7 +200,8 @@ class Fanart:
             self.__get_fanart_images(media_type=media_type, queryid=queryid)
         if media_type != MediaType.TV:
             return None
-        return self._images.get("seasonthumb", {}).get(season, "") or default
+        seasondict = self._images.get("seasonthumb", {})
+        return seasondict.get(season, "") if isinstance(seasondict, dict) else default
 
     def get_seasonbanner(self, media_type, queryid, season, default=None):
         """
@@ -212,4 +213,5 @@ class Fanart:
             self.__get_fanart_images(media_type=media_type, queryid=queryid)
         if media_type != MediaType.TV:
             return None
-        return self._images.get("seasonbanner", {}).get(season, "") or default
+        seasondict = self._images.get("seasonbanner", {})
+        return seasondict.get(season, "") if isinstance(seasondict, dict) else default

@@ -137,7 +137,7 @@ class Media:
         :param tmdb_id: TMDB的ID
         :return: 所有译名的清单
         """
-        if not mtype or not tmdb_id:
+        if not mtype or not tmdb_id or tmdb_id == "0":
             return {}, []
         tmdb_info = self.get_tmdb_info(mtype=mtype, tmdbid=tmdb_id)
         if not tmdb_info:
@@ -500,7 +500,7 @@ class Media:
         :param append_to_response: 附加信息
         :param chinese: 是否转换中文标题
         """
-        if not tmdbid:
+        if not tmdbid or tmdbid == "0":
             return None
         if not self.tmdb:
             log.error("【Meta】TMDB API Key 未设置！")
@@ -1111,7 +1111,7 @@ class Media:
           "vote_count": 2291
         }
         """
-        if not self.movie or not tmdbid:
+        if not self.movie or not tmdbid or tmdbid == "0":
             return {}
         try:
             tmdbinfo = self.movie.details(tmdbid, append_to_response)
@@ -1285,7 +1285,7 @@ class Media:
           "vote_count": 601
         }
         """
-        if not self.tv or not tmdbid:
+        if not self.tv or not tmdbid or tmdbid == "0":
             return {}
         try:
             tmdbinfo = self.tv.details(tmdbid, append_to_response)
@@ -1358,7 +1358,7 @@ class Media:
           "season_number": 1
         }
         """
-        if not self.tv or not tmdbid:
+        if not self.tv or not tmdbid or tmdbid == "0":
             return {}
         try:
             tmdbinfo = self.tv.season_details(tmdbid, season)
@@ -1371,7 +1371,7 @@ class Media:
         """
         根据TMDB查询TMDB电视剧的所有季
         """
-        if not tmdbid:
+        if not tmdbid or tmdbid == "0":
             return []
         return self.get_tmdb_tv_seasons(
             tv_info=self.__get_tmdb_tv_detail(
@@ -1438,7 +1438,7 @@ class Media:
             },
           ]
         """
-        if not tmdbid:
+        if not tmdbid or tmdbid == "0":
             return []
         season_info = self.get_tmdb_tv_season_detail(tmdbid=tmdbid, season=season)
         if not season_info:
@@ -1776,59 +1776,59 @@ class Media:
             if movies:
                 return movies.get("results")
         except Exception as e:
-            log.info(f"【Meta】：{str(e)}")
+            log.info(f"【Meta】获取发现电影:{str(e)}")
         return []
 
     def get_movie_similar(self, tmdbid, page=1):
         """
         查询类似电影
         """
-        if not self.movie:
+        if not self.movie or not tmdbid or tmdbid == "0":
             return []
         try:
             movies = self.movie.similar(movie_id=tmdbid, page=page) or []
             return self.__dict_tmdbinfos(movies, MediaType.MOVIE)
         except Exception as e:
-            log.info(f"【Meta】：{str(e)}")
+            log.info(f"【Meta】查询类似电影:{str(e)}")
             return []
 
     def get_movie_recommendations(self, tmdbid, page=1):
         """
         查询电影关联推荐
         """
-        if not self.movie:
+        if not self.movie or not tmdbid or tmdbid == "0":
             return []
         try:
             movies = self.movie.recommendations(movie_id=tmdbid, page=page) or []
             return self.__dict_tmdbinfos(movies, MediaType.MOVIE)
         except Exception as e:
-            log.info(f"【Meta】：{str(e)}")
+            log.info(f"【Meta】查询电影关联:{str(e)}")
             return []
 
     def get_tv_similar(self, tmdbid, page=1):
         """
         查询类似电视剧
         """
-        if not self.tv:
+        if not self.tv or not tmdbid or tmdbid == "0":
             return []
         try:
             tvs = self.tv.similar(tv_id=tmdbid, page=page) or []
             return self.__dict_tmdbinfos(tvs, MediaType.TV)
         except Exception as e:
-            log.info(f"【Meta】：{str(e)}")
+            log.info(f"【Meta】查询类似电视剧:{str(e)}")
             return []
 
     def get_tv_recommendations(self, tmdbid, page=1):
         """
         查询电视剧关联推荐
         """
-        if not self.tv:
+        if not self.tv or not tmdbid or tmdbid == "0":
             return []
         try:
             tvs = self.tv.recommendations(tv_id=tmdbid, page=page) or []
             return self.__dict_tmdbinfos(tvs, MediaType.TV)
         except Exception as e:
-            log.info(f"【Meta】：{str(e)}")
+            log.info(f"【Meta】查询电视剧关联:{str(e)}")
             return []
 
     def get_tmdb_discover(self, mtype, params=None, page=1):
@@ -1845,7 +1845,7 @@ class Media:
                 tvs = self.discover.discover_tv_shows(params=params, page=page)
                 return self.__dict_tmdbinfos(tvs, mtype)
         except Exception as e:
-            log.info(f"【Meta】：{str(e)}")
+            log.info(f"【Meta】获取发现(电影、电视剧):{str(e)}")
         return []
 
     def get_person_medias(self, personid, mtype, page=1):
@@ -1864,7 +1864,7 @@ class Media:
                 result = self.__dict_tmdbinfos(tvs, mtype)
             return result[(page - 1) * 20: page * 20]
         except Exception as e:
-            log.info(f"【Meta】：{str(e)}")
+            log.info(f"【Meta】查询人物相关影视作品:{str(e)}")
         return []
 
     @staticmethod
@@ -2093,7 +2093,7 @@ class Media:
         """
         获取TMDB/豆瓣详情页地址
         """
-        if not tmdbid:
+        if not tmdbid or tmdbid == "0":
             return ""
         if str(tmdbid).startswith("DB:"):
             return "https://movie.douban.com/subject/%s" % str(tmdbid).replace("DB:", "")
