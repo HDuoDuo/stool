@@ -86,7 +86,7 @@ class Sites:
             site_uses = site.INCLUDE or ''
             uses = []
             if site_uses:
-                signin_enable = True if "Q" in site_uses and site_signurl and site_cookie else False
+                signin_enable = True if "Q" in site_uses and site_signurl and (site_cookie or site_apikey) else False
                 rss_enable = True if "D" in site_uses and site_rssurl else False
                 brush_enable = True if "S" in site_uses and site_rssurl and (site_cookie or site_apikey) else False
                 statistic_enable = True if "T" in site_uses and (site_rssurl or site_signurl) and (site_cookie or site_apikey) else False
@@ -385,8 +385,10 @@ class Sites:
         
     def __rousi_test(self, url, apikey, proxy):
         """
-        判断站点是否已经登陆：rousi
+        使用 PeerGo 个人 API Key 验证 Rousi.pro 站点连接。
         """
+        if not apikey:
+            return False, "未配置个人 API Key", 0
         url = f"{url}/api/v1/profile"
         headers = {
             "Content-Type": "application/json",
@@ -403,12 +405,15 @@ class Sites:
         if res is None:
             return False, "无法打开网站！", seconds
         if res.status_code == 200:
-            user_info = res.json()
+            try:
+                user_info = res.json()
+            except (TypeError, ValueError):
+                return False, "站点返回了无效的用户数据", seconds
             if user_info and user_info.get("code") == 0:
                 return True, "连接成功", seconds
-            return False, "APIKEY已过期", seconds
-        else:
-            return False, f"错误：{res.status_code} {res.reason}", seconds
+        elif res.status_code in (401, 403):
+            return False, "个人 API Key 已失效或权限不足", seconds
+        return False, f"错误：{res.status_code} {res.reason}", seconds
         
     def __mteam_test(self, url, ua, apikey, proxy):
         site_url = url.replace("kp", "api") + "/api/system/hello"
@@ -516,12 +521,13 @@ class Sites:
         """
         if not site_info:
             return ""
-        site = site_info.get("name")
         try:
+            site = site_info.get("name")
             site_url = site_info.get("signurl")
             site_cookie = site_info.get("cookie")
             ua = site_info.get("ua")
-            if not site_url or not site_cookie:
+            site_apikey = site_info.get("apikey")
+            if not site_url or not (site_cookie or site_apikey):
                 log.warn("【Sites】未配置 %s 的站点地址或Cookie，无法签到" % str(site))
                 return ""
             chrome = ChromeHelper()
@@ -587,11 +593,11 @@ class Sites:
                 if parser == "RousiPro":
                     headers = {"User-Agent": ua,
                                "Accept": "application/json, text/plain, */*",
-                               "Authorization": site_cookie if site_cookie.startswith("Bearer ") else f"Bearer {site_cookie}"}
+                               "api-token": site_apikey}
                     signurl = StringUtils.get_base_url(site_url) + "/api/points/attendance"
                     res = RequestUtils(headers=headers,
                                        proxies=Config().get_proxies() if site_info.get("proxy") else None
-                                      ).post_res(url=signurl)
+                                      ).post_res(url=signurl, json={"mode": "fixed"})
                 else:
                     res = RequestUtils(cookies=site_cookie,
                                        headers=ua,

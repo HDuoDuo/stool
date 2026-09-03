@@ -376,7 +376,7 @@ class Downloader:
                         )
                 return ret, ""
             else:
-                return ret, "请检查下载任务是否已存在"
+                return ret, "请测试下载器或检查下载任务是否已存在"
         except Exception as e:
             ExceptionUtils.exception_traceback(e)
             log.error("【Downloader】添加下载任务出错：%s" % str(e))

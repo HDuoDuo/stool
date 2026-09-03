@@ -13,8 +13,8 @@ from app.utils.types import SiteSchema
 
 class RousiSiteUserInfo(SiteParserBase):
     """
-    Rousi.pro 站点解析器
-    使用 API v1 接口，通过 Passkey (Bearer Token) 进行认证
+    Rousi.pro PeerGo 用户数据解析器。
+    使用具有 profile:read 权限的个人 API Key 访问兼容资料接口。
     """
     schema = SiteSchema.RousiPro
     order = SITE_BASE_ORDER + 50
@@ -22,16 +22,16 @@ class RousiSiteUserInfo(SiteParserBase):
 
     @classmethod
     def match(cls, html_text):
-        # 馒头手动绑定
-        return 'Rousi Pro' in html_text
+        # rousi手动绑定
+        return 'PeerGo' in html_text
 
     def _parse_site_page(self, html_text: str):
         """
         配置 API 请求地址和请求头
-        使用 API v1 的 /profile 接口获取用户信息
+        使用 PeerGo 兼容的 /profile 接口获取用户信息。
         """
         self._base_url = f'https://{StringUtils.get_url_domain(self.site_url)}'
-        self._user_basic_page = "api/v1/profile?include_fields[user]=seeding_leeching_data"
+        self._user_basic_page = "api/v1/profile"
         self._user_basic_params = {}
         self._user_basic_headers = {
             "Content-Type": "application/json",
@@ -89,13 +89,18 @@ class RousiSiteUserInfo(SiteParserBase):
             logger.error(f'{self.site_name} JSON 解析失败')
             return
 
-        if not data or data.get("code") != 0:
-            self.err_msg = data.get("message", "未知错误")
+        if not isinstance(data, dict):
+            self.err_msg = "用户数据响应结构无效"
+            logger.warn(f"{self._site_name} API 响应结构无效")
+            return
+
+        if data.get("code") != 0:
+            self.err_msg = str(data.get("message") or "未知错误")
             logger.warn(f'{self.site_name} API 错误: {self.err_msg}')
             return
 
         user_info = data.get("data")
-        if not user_info:
+        if not isinstance(user_info, dict):
             return
 
         # 基本信息
@@ -104,7 +109,10 @@ class RousiSiteUserInfo(SiteParserBase):
         self.user_level = user_info.get("level_text") or user_info.get("role_text")
 
         # 注册时间：统一格式为 YYYY-MM-DD HH:MM:SS
-        join_at = StringUtils.unify_datetime_str(user_info.get("registered_at"))
+        registered_at = user_info.get("registered_at")
+        join_at = ( 
+            StringUtils.unify_datetime_str(registered_at) if isinstance(registered_at, str) else None
+        )
         if join_at:
             # 确保格式为 YYYY-MM-DD HH:MM:SS (19位)
             if len(join_at) >= 19:

@@ -11,12 +11,10 @@ from app.utils import RequestUtils, StringUtils
 
 class RousiSpider:
     """
-    Rousi.pro API v1 Spider
+    Rousi.pro PeerGo 兼容 API 索引器。
 
-    使用 API v1 接口进行种子搜索
-    - 认证方式：Bearer Token (Passkey)
-    - 搜索接口：/api/v1/torrents
-    - 详情接口：/api/v1/torrents/:id
+    使用个人 API Key 访问搜索兼容接口，并通过详情接口换取短时下载地址。
+    API Key 需要授予 torrent:read 和 torrent:download 权限。
     """
     _indexerid = None
     _domain = None
@@ -36,7 +34,7 @@ class RousiSpider:
     _tv_category = 'tv'
     _ninekg_category = '9kg'
 
-    # API KEY
+    # PeerGo 个人 API Key
     _apikey = None
 
     def __init__(self, indexer: dict):
@@ -200,7 +198,7 @@ class RousiSpider:
                 'downloadvolumefactor': downloadvolumefactor,
                 'uploadvolumefactor': uploadvolumefactor,
                 'freedate': freedate,
-                'page_url': f"https://{self._domain}/torrent/{result.get('uuid')}",
+                'page_url': f"https://{self._domain}/torrents/{result.get('uuid')}",
                 'labels': [],
                 'category': category,
                 'genre_ids': genre_ids
@@ -219,7 +217,7 @@ class RousiSpider:
         :return: (是否发生错误, 种子列表)
         """
         if not self._apikey:
-            logger.warn(f"{self._name} 未配置 API Key (Passkey)")
+            logger.warn(f"{self._name} 未配置个人 API Key")
             return True, []
 
         params = self.__get_params(keyword, mtype, cat, page, pagesize)
@@ -248,7 +246,7 @@ class RousiSpider:
     #     :return: (是否发生错误, 种子列表)
     #     """
     #     if not self._apikey:
-    #         logger.warn(f"{self._name} 未配置 API Key (Passkey)")
+    #         logger.warn(f"{self._name} 未配置个人 API Key")
     #         return True, []
 
     #     params = self.__get_params(keyword, mtype, cat, page)
@@ -267,10 +265,8 @@ class RousiSpider:
 
     def __get_download_url(self, torrent_id: int) -> str:
         """
-        构建种子下载链接
-
-        使用 base64 编码的方式告诉 MoviePilot 如何获取真实下载地址
-        MoviePilot 会先请求详情接口，然后从响应中提取 data.download_url
+        使用base64编码 构建种子下载链接
+        个人 APIKey 请求详情接口，提取带 capability 的短时下载地址。
 
         :param torrent_id: 种子 ID
         :return: base64 编码的请求配置字符串 + 详情接口 URL
